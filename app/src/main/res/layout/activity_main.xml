@@ -11,6 +11,16 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <com.pabortpag.youtotext.ui.view.AsciiView
+        android:id="@+id/asciiView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:background="@color/white"
+        app:layout_constraintBottom_toTopOf="@+id/image_capture_button"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"  />
+
     <Button
         android:id="@+id/image_capture_button"
         android:layout_width="110dp"
