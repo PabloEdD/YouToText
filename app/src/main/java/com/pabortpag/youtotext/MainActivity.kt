@@ -3,10 +3,15 @@ package com.pabortpag.youtotext
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.media.Image
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
+import android.util.Size
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -16,6 +21,8 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.MediaStoreOutputOptions
@@ -27,7 +34,15 @@ import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.bumptech.glide.Glide
 import com.pabortpag.youtotext.databinding.ActivityMainBinding
+import com.pabortpag.youtotext.ui.view.AsciiView
+import com.pabortpag.youtotext.ui.viewmodel.AsciiViewModel
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -35,6 +50,15 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 typealias LumaListener = (luma: Double) -> Unit
+typealias LuminanceGridListener = (grid: ByteArray, width: Int, height: Int) -> Unit
+
+//  __    __               ______        ______                __
+// /\ \  /\ \             /\__  _\      /\__  _\              /\ \__
+// \ `\`\\/'/ ___   __  __\/_/\ \/   ___\/_/\ \/    __   __  _\ \ ,_\
+//  `\ `\ /' / __`\/\ \/\ \  \ \ \  / __`\ \ \ \  /'__`\/\ \/'\\ \ \/
+//    `\ \ \/\ \L\ \ \ \_\ \  \ \ \/\ \L\ \ \ \ \/\  __/\/>  </ \ \ \_
+//      \ \_\ \____/\ \____/   \ \_\ \____/  \ \_\ \____\/\_/\_\ \ \__\
+//       \/_/\/___/  \/___/     \/_/\/___/    \/_/\/____/\//\/_/  \/__/
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -43,6 +67,7 @@ class MainActivity : AppCompatActivity() {
 
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
+    private val asciiViewModel: AsciiViewModel by lazy { AsciiViewModel() }
 
     private lateinit var cameraExecutor: ExecutorService
 
@@ -50,6 +75,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        cameraExecutor = Executors.newSingleThreadExecutor()
 
         // Request camera permissions
         if(allPermissionsGranted()) {
@@ -62,7 +89,17 @@ class MainActivity : AppCompatActivity() {
         binding.imageCaptureButton.setOnClickListener { takePhoto() }
         binding.videoCaptureButton.setOnClickListener { captureVideo() }
 
-        cameraExecutor = Executors.newSingleThreadExecutor()
+        // 🔹 Observación segura al ciclo de vida
+        val asciiView = binding.asciiView
+        asciiView.bringToFront() // Garantiza que se pinte encima del PreviewView
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                asciiViewModel.asciiFrame.collectLatest { text ->
+                    asciiView.updateText(text)
+                }
+            }
+        }
     }
 
     private fun takePhoto() {
@@ -101,6 +138,13 @@ class MainActivity : AppCompatActivity() {
                     val msg = "Photo capture succeeded: ${output.savedUri}"
                     Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
                     Log.d(TAG, msg)
+
+                }
+
+                override fun onPostviewBitmapAvailable(bitmap: Bitmap) {
+                    super.onPostviewBitmapAvailable(bitmap)
+
+                    Log.d(TAG, "bitmap: " + bitmap)
                 }
             }
         )
@@ -191,7 +235,7 @@ class MainActivity : AppCompatActivity() {
             val preview = Preview.Builder()
                 .build()
                 .also {
-                    it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
+                    it.surfaceProvider = binding.viewFinder.surfaceProvider
                 }
             val recorder = Recorder.Builder()
                 .setQualitySelector(QualitySelector.from(Quality.HIGHEST,
@@ -201,15 +245,30 @@ class MainActivity : AppCompatActivity() {
 
             imageCapture = ImageCapture.Builder().build()
 
-//            val imageAnalyzer = ImageAnalysis.Builder().build()
-//                .also {
-//                    it.setAnalyzer(
-//                        cameraExecutor,
-//                        LuminosityAnalyzer { luma ->
-//                            Log.d(TAG, "Average luminosity: $luma")
-//                        }
-//                    )
-//                }
+            val imageAnalysis = ImageAnalysis.Builder()
+                .setResolutionSelector(
+                    ResolutionSelector.Builder()
+                        .setResolutionStrategy(
+                            ResolutionStrategy(
+                                Size(480, 640), // Target: ~480x640 píxeles
+                                ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER // Si no existe exacto, toma la siguiente más alta
+                            )
+                        )
+                        .build()
+                )
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST) // Evita cola de frames
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
+                .build()
+                .also { analysis ->
+                    analysis.setAnalyzer(cameraExecutor, LuminosityAnalyzer(
+                        listener = { luma -> Log.d(TAG, "Avg luminosity: $luma") },
+                        gridListener = { grid, width, height ->
+                            asciiViewModel.onGridReceived(grid, width, height)
+                            Log.d(TAG, "ASCII grid ready: ${width}x${height} = ${grid.size} celdas")
+                        },
+                        blockFactor = 4 // Ajusta según rendimiento: 2=más detalle, 6=más FPS
+                    ))
+                }
 
             // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -219,9 +278,8 @@ class MainActivity : AppCompatActivity() {
                 cameraProvider.unbindAll()
 
                 // Bind use cases to camera
-                cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageCapture, videoCapture)
-                // cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, imageAnalyzer)
+//                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, videoCapture)
+                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, videoCapture, imageAnalysis)
 
             } catch(exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
@@ -277,25 +335,74 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-    private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
-
-        private fun ByteBuffer.toByteArray(): ByteArray {
-            rewind()    // Rewind the buffer to zero
-            val data = ByteArray(remaining())
-            get(data)   // Copy the buffer into a byte array
-            return data // Return the byte array
-        }
+    private class LuminosityAnalyzer(
+        private val listener: LumaListener? = null,
+        private val gridListener: LuminanceGridListener? = null,
+        private val blockFactor: Int = 4
+    ) : ImageAnalysis.Analyzer {
 
         override fun analyze(image: ImageProxy) {
+            try {
+                val yBuffer = image.planes[0].buffer
+                val yRowStride = image.planes[0].rowStride
+                val yPixelStride = image.planes[0].pixelStride
+                val srcWidth = image.width
+                val srcHeight = image.height
 
-            val buffer = image.planes[0].buffer
-            val data = buffer.toByteArray()
-            val pixels = data.map { it.toInt() and 0xFF }
-            val luma = pixels.average()
+                if (listener != null) {
+                    var sum = 0L
+                    var count = 0
+                    var y = 0
+                    while (y < srcHeight) {
+                        var x = 0
+                        while (x < srcWidth) {
+                            val idx = y * yRowStride + x * yPixelStride
+                            sum += yBuffer.get(idx).toInt() and 0xFF
+                            count++
+                            x += yPixelStride // Avanzar según stride real
+                        }
+                        y++
+                    }
+                    listener(if (count > 0) sum.toDouble() / count else 0.0)
+                }
 
-            listener(luma)
+                // 🔹 NUEVO: Generar grilla para ASCII (solo si hay listener registrado)
+                if (gridListener != null) {
+                    val outWidth = (srcWidth + blockFactor - 1) / blockFactor
+                    val outHeight = (srcHeight + blockFactor - 1) / blockFactor
+                    val grid = ByteArray(outWidth * outHeight)
+                    var outIndex = 0
 
-            image.close()
+                    var y = 0
+                    while (y < srcHeight) {
+                        var x = 0
+                        while (x < srcWidth) {
+                            var blockSum = 0
+                            var blockCount = 0
+
+                            var dy = 0
+                            while (dy < blockFactor && (y + dy) < srcHeight) {
+                                var dx = 0
+                                while (dx < blockFactor && (x + dx) < srcWidth) {
+                                    val bufIdx = (y + dy) * yRowStride + (x + dx) * yPixelStride
+                                    blockSum += yBuffer.get(bufIdx).toInt() and 0xFF
+                                    blockCount++
+                                    dx++
+                                }
+                                dy++
+                            }
+
+                            grid[outIndex++] = (blockSum / blockCount).toByte()
+                            x += blockFactor
+                        }
+                        y += blockFactor
+                    }
+
+                    gridListener(grid, outWidth, outHeight)
+                }
+            } finally {
+                image.close()
+            }
         }
     }
 }
