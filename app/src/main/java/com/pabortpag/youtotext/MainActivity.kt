@@ -2,6 +2,7 @@ package com.pabortpag.youtotext
 
 import android.Manifest
 import android.content.ContentValues
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -74,6 +75,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
         setContentView(binding.root)
 
         cameraExecutor = Executors.newSingleThreadExecutor()
@@ -266,7 +268,8 @@ class MainActivity : AppCompatActivity() {
                             asciiViewModel.onGridReceived(grid, width, height)
                             Log.d(TAG, "ASCII grid ready: ${width}x${height} = ${grid.size} celdas")
                         },
-                        blockFactor = 4 // Ajusta según rendimiento: 2=más detalle, 6=más FPS
+                        blockFactor = 4, // Ajusta según rendimiento: 2=más detalle, 6=más FPS
+                        mirrorHorizontally = true
                     ))
                 }
 
@@ -338,7 +341,8 @@ class MainActivity : AppCompatActivity() {
     private class LuminosityAnalyzer(
         private val listener: LumaListener? = null,
         private val gridListener: LuminanceGridListener? = null,
-        private val blockFactor: Int = 4
+        private val blockFactor: Int = 4,
+        private val mirrorHorizontally: Boolean = false
     ) : ImageAnalysis.Analyzer {
 
         override fun analyze(image: ImageProxy) {
@@ -348,6 +352,7 @@ class MainActivity : AppCompatActivity() {
                 val yPixelStride = image.planes[0].pixelStride
                 val srcWidth = image.width
                 val srcHeight = image.height
+                val rotation = image.imageInfo.rotationDegrees // detectar rotación
 
                 if (listener != null) {
                     var sum = 0L
@@ -366,7 +371,7 @@ class MainActivity : AppCompatActivity() {
                     listener(if (count > 0) sum.toDouble() / count else 0.0)
                 }
 
-                // 🔹 NUEVO: Generar grilla para ASCII (solo si hay listener registrado)
+                // Generar grilla para ASCII (solo si hay listener registrado)
                 if (gridListener != null) {
                     val outWidth = (srcWidth + blockFactor - 1) / blockFactor
                     val outHeight = (srcHeight + blockFactor - 1) / blockFactor
@@ -398,11 +403,37 @@ class MainActivity : AppCompatActivity() {
                         y += blockFactor
                     }
 
-                    gridListener(grid, outWidth, outHeight)
+                    val finalGrid: ByteArray; var finalW: Int; var finalH: Int
+                    if (rotation == 90 || rotation == 270) {
+                        finalGrid = transposeGrid(grid, outWidth, outHeight)
+                        finalW = outHeight; finalH = outWidth
+                    } else {
+                        finalGrid = grid; finalW = outWidth; finalH = outHeight
+                    }
+
+                    val outputGrid = if (mirrorHorizontally) mirrorGrid(finalGrid, finalW, finalH) else finalGrid
+
+                    gridListener(outputGrid, finalW, finalH)
+                    Log.d("Grid","Grid: $outputGrid, W: $finalW, H: $finalH" )
                 }
             } finally {
                 image.close()
             }
+        }
+        private fun transposeGrid(input: ByteArray, width: Int, height: Int): ByteArray {
+            val output = ByteArray(input.size)
+            for (y in 0 until height) {
+                for (x in 0 until width) {
+                    output[x * height + y] = input[y * width + x]
+                }
+            }
+            return output
+        }
+
+        private fun mirrorGrid(input: ByteArray, width: Int, height: Int): ByteArray {
+            val output = ByteArray(input.size)
+            for (y in 0 until height) for (x in 0 until width) output[y * width + (width - 1 - x)] = input[y * width + x]
+            return output
         }
     }
 }
