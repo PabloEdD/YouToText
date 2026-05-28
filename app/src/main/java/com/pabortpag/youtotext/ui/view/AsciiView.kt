@@ -14,54 +14,56 @@ class AsciiView @JvmOverloads constructor(
 
     private val paint = Paint().apply {
         typeface = Typeface.MONOSPACE
-        textSize = 12f
-        color = Color.parseColor("#00FF00")
         isAntiAlias = false
+        color = Color.parseColor("#00FF00")
+        textAlign = Paint.Align.LEFT
     }
 
     private var asciiText = ""
     private var lineHeight = 0f
-    private var isScaleCalculated = false
 
     fun updateText(text: String) {
         asciiText = text
-        if (!isScaleCalculated && width > 0 && height > 0 && text.isNotBlank()) {
-            calculateTextSize()
-            isScaleCalculated = true
-        }
-        postInvalidateOnAnimation() // ✅ Sincroniza con refresco de pantalla
+        if (width > 0 && height > 0) calculateTextSize()
+        invalidate()
     }
 
     private fun calculateTextSize() {
-        val lines = asciiText.split('\n').filter { it.isNotBlank() }
+        val lines = asciiText.split('\n').filter { it.isNotEmpty() }
         if (lines.isEmpty()) return
 
         val maxCols = lines.maxOf { it.length }
-        val fm = paint.fontMetrics
-        lineHeight = fm.descent - fm.ascent
 
-        val widthScale = width.toFloat() / (maxCols * paint.measureText("M"))
-        val heightScale = height.toFloat() / (lines.size * lineHeight)
-        paint.textSize = (12f * minOf(widthScale, heightScale)).coerceIn(6f, 18f)
+        // 🔹 1. Medimos proporciones reales a un tamaño base seguro (20f)
+        paint.textSize = 20f
+        val baseCharWidth = paint.measureText("M")
+        val baseLineHeight = paint.fontMetrics.run { descent - ascent }
 
-        val newFm = paint.fontMetrics
-        lineHeight = newFm.descent - newFm.ascent
+        // 🔹 2. Calculamos el tamaño exacto para que llene el ANCHO de la pantalla
+        // Fórmula directa: AnchoPantalla / (Columnas * AnchoCaracterUnitario)
+        val finalSize = width.toFloat() / (maxCols * (baseCharWidth / 20f))
+
+        // Aplicamos tamaño (mínimo 10f para seguridad, sin límite superior)
+        paint.textSize = finalSize.coerceAtLeast(10f)
+
+        // Recalculamos altura de línea con el tamaño real
+        lineHeight = paint.fontMetrics.run { descent - ascent }
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        isScaleCalculated = false // 🔓 Recalcular al girar/redimensionar
+        if (w > 0 && h > 0) calculateTextSize() // Recalcula al girar o cambiar layout
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        canvas.drawColor(Color.BLACK)
+        canvas.drawColor(Color.BLACK) // Fondo sólido evita parpadeo
         if (asciiText.isEmpty()) return
 
-        val lines = asciiText.split('\n')
         var y = lineHeight
+        val lines = asciiText.split('\n')
         for (line in lines) {
-            if (y > height) break
+            if (y > height) break // Corta renderizado fuera de pantalla
             canvas.drawText(line, 0f, y, paint)
             y += lineHeight
         }

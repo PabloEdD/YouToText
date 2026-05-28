@@ -80,7 +80,7 @@ class MainActivity : AppCompatActivity() {
 
         cameraExecutor = Executors.newSingleThreadExecutor()
 
-        // Request camera permissions
+        // Request camera perfmissions
         if(allPermissionsGranted()) {
             startCamera()
         } else {
@@ -268,7 +268,7 @@ class MainActivity : AppCompatActivity() {
                             asciiViewModel.onGridReceived(grid, width, height)
                             Log.d(TAG, "ASCII grid ready: ${width}x${height} = ${grid.size} celdas")
                         },
-                        blockFactor = 4, // Ajusta según rendimiento: 2=más detalle, 6=más FPS
+                        blockFactor = 12, // Ajusta según rendimiento: 2=más detalle, 6=más FPS
                         mirrorHorizontally = true
                     ))
                 }
@@ -415,6 +415,7 @@ class MainActivity : AppCompatActivity() {
 
                     gridListener(outputGrid, finalW, finalH)
                     Log.d("Grid","Grid: $outputGrid, W: $finalW, H: $finalH" )
+                    Log.d("Frame", "Frame: ${image.width}x${image.height} | Grid: ${outWidth}x${outHeight} | Rot: $rotation°")
                 }
             } finally {
                 image.close()
