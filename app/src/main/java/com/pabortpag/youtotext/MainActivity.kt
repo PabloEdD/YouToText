@@ -1,7 +1,10 @@
 package com.pabortpag.youtotext
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ContentValues
+import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -35,6 +38,10 @@ import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -78,6 +85,11 @@ class MainActivity : AppCompatActivity() {
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
         setContentView(binding.root)
 
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val insetsController = WindowInsetsControllerCompat(window, binding.root)
+        insetsController.hide(WindowInsetsCompat.Type.systemBars())
+        insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         // Request camera perfmissions
@@ -90,6 +102,7 @@ class MainActivity : AppCompatActivity() {
         // Set UP THE LISTENERS FOR TAKE PHOTO AND VIDEO CAPTURE BUTTONS
         binding.imageCaptureButton.setOnClickListener { takePhoto() }
         binding.videoCaptureButton.setOnClickListener { captureVideo() }
+        binding.copyButton.setOnClickListener { copyAsciiToClipboard(asciiViewModel.currentAscii) }
 
         // 🔹 Observación segura al ciclo de vida
         val asciiView = binding.asciiView
@@ -226,6 +239,17 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
+    private fun copyAsciiToClipboard(text: String) {
+        if (text.isEmpty()) {
+            Toast.makeText(this, "Esperando primer frame ASCII...", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("YouToText ASCII", text)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(this, "✅ ASCII copiado al portapapeles", Toast.LENGTH_SHORT).show()
+    }
+
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
@@ -268,7 +292,7 @@ class MainActivity : AppCompatActivity() {
                             asciiViewModel.onGridReceived(grid, width, height)
                             Log.d(TAG, "ASCII grid ready: ${width}x${height} = ${grid.size} celdas")
                         },
-                        blockFactor = 12, // Ajusta según rendimiento: 2=más detalle, 6=más FPS
+                        blockFactor = 12,
                         mirrorHorizontally = true
                     ))
                 }
