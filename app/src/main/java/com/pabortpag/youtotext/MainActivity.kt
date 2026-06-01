@@ -9,6 +9,7 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.media.Image
 import android.os.Build
 import android.os.Bundle
@@ -59,8 +60,12 @@ import java.util.concurrent.Executors
 import androidx.appcompat.app.AlertDialog
 import android.widget.SeekBar
 import android.graphics.Color
+import android.net.Uri
+import android.view.View
 import com.pabortpag.youtotext.data.SettingsPrefs
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 
 typealias LumaListener = (luma: Double) -> Unit
 typealias LuminanceGridListener = (grid: ByteArray, width: Int, height: Int) -> Unit
@@ -116,6 +121,17 @@ class MainActivity : AppCompatActivity() {
         binding.switchCamButton.setOnClickListener {
             useFrontCamera = !useFrontCamera
             restartCamera()
+        }
+        binding.photoButton.setOnClickListener {
+            lifecycleScope.launch {
+                binding.photoButton.isEnabled = false // Evita pulsos múltiples
+                val success = exportAsciiViewToPng(binding.asciiView)
+
+                val msg = if (success) "Imagen guardada en Galería" else "Error al guardar"
+                Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+
+                binding.photoButton.isEnabled = true
+            }
         }
 
         if (allPermissionsGranted()) startCamera() else requestPermissions()
@@ -290,6 +306,43 @@ class MainActivity : AppCompatActivity() {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText("YouToText ASCII", text)
         clipboard.setPrimaryClip(clip)
+    }
+
+    private suspend fun exportAsciiViewToPng(view: View): Boolean {
+        if (view.width <= 0 || view.height <= 0) return false
+
+        val bitmap = withContext(Dispatchers.Main) {
+            val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bmp)
+            view.draw(canvas) // Renderiza exactamente lo que ve el usuario
+            bmp
+        }
+
+        return withContext(Dispatchers.IO) {
+            try {
+                val resolver = contentResolver
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, "YouToText_${System.currentTimeMillis()}.png")
+                    put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/YouToText/")
+                    }
+                }
+
+                val uri: Uri? = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                uri?.let {
+                    resolver.openOutputStream(it)?.use { stream ->
+                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                    }
+                }
+                uri != null
+            } catch (e: Exception) {
+                Log.e("YouToText", "Error exportando PNG", e)
+                false
+            } finally {
+                bitmap.recycle() // Libera memoria nativa inmediatamente
+            }
+        }
     }
 
     private fun startCamera() {
