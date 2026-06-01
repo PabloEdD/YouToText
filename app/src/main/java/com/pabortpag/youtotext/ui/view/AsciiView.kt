@@ -54,7 +54,6 @@ class AsciiView @JvmOverloads constructor(
         // 1. Medir referencia a tamaño base seguro
         paint.textSize = 100f
         val baseAdvance = paint.measureText("M")
-        val baseLineHeight = paint.fontMetrics.run { descent - ascent }
 
         // 2. Cálculo dinámico para llenar SIEMPRE el ancho disponible
         val neededWidth = maxCols * baseAdvance
