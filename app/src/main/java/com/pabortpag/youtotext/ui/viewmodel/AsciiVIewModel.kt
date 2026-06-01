@@ -13,16 +13,26 @@ class AsciiViewModel : ViewModel() {
     private val _asciiFrame = MutableStateFlow("")
     val asciiFrame: StateFlow<String> = _asciiFrame.asStateFlow()
 
+    var currentAscii: String = ""
+        private set // Cache del último frame ASCII procesado. Permite acceso rápido desde la UI (ej. botón copiar)
+
     // Configuración UI (persistir con DataStore en Fase 3)
     var invertColors = false
 
     /**
-     * Recibe la grilla del analyzer, procesa en hilo IO/Default y actualiza StateFlow.
+     * Recibe el grid del analyzer, procesa en hilo IO/Default y actualiza StateFlow.
      */
     fun onGridReceived(grid: ByteArray, width: Int, height: Int) {
         viewModelScope.launch(Dispatchers.Default) {
-            val ascii = AsciiMapper.mapToAscii(grid, width, height, invertColors)
+            val palette = com.pabortpag.youtotext.data.SettingsPrefs.getPalette()
+
+            val ascii = AsciiMapper.mapToAscii(
+                grid, width, height,
+                palette = palette, // 🔹 Pasar la paleta dinámica
+                invert = invertColors
+            )
             _asciiFrame.value = ascii
+            currentAscii = ascii
         }
     }
 }

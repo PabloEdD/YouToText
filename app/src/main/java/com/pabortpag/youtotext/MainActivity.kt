@@ -56,6 +56,11 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import androidx.appcompat.app.AlertDialog
+import android.widget.SeekBar
+import android.graphics.Color
+import com.pabortpag.youtotext.data.SettingsPrefs
+import kotlinx.coroutines.flow.first
 
 typealias LumaListener = (luma: Double) -> Unit
 typealias LuminanceGridListener = (grid: ByteArray, width: Int, height: Int) -> Unit
@@ -72,10 +77,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
     private var imageCapture: ImageCapture? = null
-
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
     private val asciiViewModel: AsciiViewModel by lazy { AsciiViewModel() }
+    private var cameraProvider: ProcessCameraProvider? = null
 
     private lateinit var cameraExecutor: ExecutorService
 
@@ -84,16 +89,20 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
         setContentView(binding.root)
+        SettingsPrefs.init(this)
+
+        binding.asciiView.setBaseColor(SettingsPrefs.getColor())
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val insetsController = WindowInsetsControllerCompat(window, binding.root)
         insetsController.hide(WindowInsetsCompat.Type.systemBars())
-        insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        insetsController.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         // Request camera perfmissions
-        if(allPermissionsGranted()) {
+        if (allPermissionsGranted()) {
             startCamera()
         } else {
             requestPermissions()
@@ -103,6 +112,33 @@ class MainActivity : AppCompatActivity() {
         binding.imageCaptureButton.setOnClickListener { takePhoto() }
         binding.videoCaptureButton.setOnClickListener { captureVideo() }
         binding.copyButton.setOnClickListener { copyAsciiToClipboard(asciiViewModel.currentAscii) }
+
+        if (allPermissionsGranted()) startCamera() else requestPermissions()
+        cameraExecutor = Executors.newSingleThreadExecutor()
+
+        binding.btnDensity.setOnClickListener {
+            val current = SettingsPrefs.getBlockFactor()
+            showDensityDialog(current) { newFactor ->
+                SettingsPrefs.updateBlockFactor(newFactor)
+                restartCamera()
+            }
+        }
+
+        binding.btnPalette.setOnClickListener {
+            val current = SettingsPrefs.getPalette()
+            showPaletteDialog(current) { newPalette ->
+                SettingsPrefs.updatePalette(newPalette)
+                restartCamera()
+            }
+        }
+
+        binding.btnColor.setOnClickListener {
+            val current = SettingsPrefs.getColor()
+            showColorDialog(current) { newColor ->
+                SettingsPrefs.updateColor(newColor)
+                binding.asciiView.setBaseColor(newColor) // Aplica color al vuelo
+            }
+        }
 
         // 🔹 Observación segura al ciclo de vida
         val asciiView = binding.asciiView
@@ -127,16 +163,18 @@ class MainActivity : AppCompatActivity() {
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-            if(Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
                 put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/YouToText-Images")
             }
         }
 
         // Create output options object which contains file + metadata
         val outputOptions = ImageCapture.OutputFileOptions
-            .Builder(contentResolver,
+            .Builder(
+                contentResolver,
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                contentValues)
+                contentValues
+            )
             .build()
 
         // Set up image capture listener, which is triggered after photo has
@@ -149,7 +187,7 @@ class MainActivity : AppCompatActivity() {
                     Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
                 }
 
-                override fun onImageSaved(output: ImageCapture.OutputFileResults){
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     val msg = "Photo capture succeeded: ${output.savedUri}"
                     Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
                     Log.d(TAG, msg)
@@ -247,7 +285,6 @@ class MainActivity : AppCompatActivity() {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText("YouToText ASCII", text)
         clipboard.setPrimaryClip(clip)
-        Toast.makeText(this, "✅ ASCII copiado al portapapeles", Toast.LENGTH_SHORT).show()
     }
 
     private fun startCamera() {
@@ -264,8 +301,12 @@ class MainActivity : AppCompatActivity() {
                     it.surfaceProvider = binding.viewFinder.surfaceProvider
                 }
             val recorder = Recorder.Builder()
-                .setQualitySelector(QualitySelector.from(Quality.HIGHEST,
-                    FallbackStrategy.higherQualityOrLowerThan(Quality.SD)))
+                .setQualitySelector(
+                    QualitySelector.from(
+                        Quality.HIGHEST,
+                        FallbackStrategy.higherQualityOrLowerThan(Quality.SD)
+                    )
+                )
                 .build()
             videoCapture = VideoCapture.withOutput(recorder)
 
@@ -286,15 +327,20 @@ class MainActivity : AppCompatActivity() {
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                 .build()
                 .also { analysis ->
-                    analysis.setAnalyzer(cameraExecutor, LuminosityAnalyzer(
-                        listener = { luma -> Log.d(TAG, "Avg luminosity: $luma") },
-                        gridListener = { grid, width, height ->
-                            asciiViewModel.onGridReceived(grid, width, height)
-                            Log.d(TAG, "ASCII grid ready: ${width}x${height} = ${grid.size} celdas")
-                        },
-                        blockFactor = 12,
-                        mirrorHorizontally = true
-                    ))
+                    analysis.setAnalyzer(
+                        cameraExecutor, LuminosityAnalyzer(
+                            listener = { luma -> Log.d(TAG, "Avg luminosity: $luma") },
+                            gridListener = { grid, width, height ->
+                                asciiViewModel.onGridReceived(grid, width, height)
+                                Log.d(
+                                    TAG,
+                                    "ASCII grid ready: ${width}x${height} = ${grid.size} celdas"
+                                )
+                            },
+                            blockFactor = SettingsPrefs.getBlockFactor(),
+                            mirrorHorizontally = true
+                        )
+                    )
                 }
 
             // Select back camera as a default
@@ -306,9 +352,16 @@ class MainActivity : AppCompatActivity() {
 
                 // Bind use cases to camera
 //                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, videoCapture)
-                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, videoCapture, imageAnalysis)
+                cameraProvider.bindToLifecycle(
+                    this,
+                    cameraSelector,
+                    preview,
+                    imageCapture,
+                    videoCapture,
+                    imageAnalysis
+                )
 
-            } catch(exc: Exception) {
+            } catch (exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
             }
 
@@ -321,7 +374,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(
-            baseContext, it) == PackageManager.PERMISSION_GRANTED
+            baseContext, it
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     override fun onDestroy() {
@@ -337,7 +391,7 @@ class MainActivity : AppCompatActivity() {
                 Manifest.permission.CAMERA,
                 Manifest.permission.RECORD_AUDIO
             ).apply {
-                if(Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
                     add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 }
             }.toTypedArray()
@@ -345,7 +399,8 @@ class MainActivity : AppCompatActivity() {
 
     private val activityResultLauncher =
         registerForActivityResult(
-            ActivityResultContracts.RequestMultiplePermissions())
+            ActivityResultContracts.RequestMultiplePermissions()
+        )
         { permissions ->
             // Handle Permission granted/rejected
             var permissionGranted = true
@@ -354,9 +409,11 @@ class MainActivity : AppCompatActivity() {
                     permissionGranted = false
             }
             if (!permissionGranted) {
-                Toast.makeText(baseContext,
+                Toast.makeText(
+                    baseContext,
                     "Permission request denied",
-                    Toast.LENGTH_SHORT).show()
+                    Toast.LENGTH_SHORT
+                ).show()
             } else {
                 startCamera()
             }
@@ -427,7 +484,9 @@ class MainActivity : AppCompatActivity() {
                         y += blockFactor
                     }
 
-                    val finalGrid: ByteArray; var finalW: Int; var finalH: Int
+                    val finalGrid: ByteArray;
+                    var finalW: Int;
+                    var finalH: Int
                     if (rotation == 90 || rotation == 270) {
                         finalGrid = transposeGrid(grid, outWidth, outHeight)
                         finalW = outHeight; finalH = outWidth
@@ -435,16 +494,21 @@ class MainActivity : AppCompatActivity() {
                         finalGrid = grid; finalW = outWidth; finalH = outHeight
                     }
 
-                    val outputGrid = if (mirrorHorizontally) mirrorGrid(finalGrid, finalW, finalH) else finalGrid
+                    val outputGrid =
+                        if (mirrorHorizontally) mirrorGrid(finalGrid, finalW, finalH) else finalGrid
 
                     gridListener(outputGrid, finalW, finalH)
-                    Log.d("Grid","Grid: $outputGrid, W: $finalW, H: $finalH" )
-                    Log.d("Frame", "Frame: ${image.width}x${image.height} | Grid: ${outWidth}x${outHeight} | Rot: $rotation°")
+                    Log.d("Grid", "Grid: $outputGrid, W: $finalW, H: $finalH")
+                    Log.d(
+                        "Frame",
+                        "Frame: ${image.width}x${image.height} | Grid: ${outWidth}x${outHeight} | Rot: $rotation°"
+                    )
                 }
             } finally {
                 image.close()
             }
         }
+
         private fun transposeGrid(input: ByteArray, width: Int, height: Int): ByteArray {
             val output = ByteArray(input.size)
             for (y in 0 until height) {
@@ -457,8 +521,69 @@ class MainActivity : AppCompatActivity() {
 
         private fun mirrorGrid(input: ByteArray, width: Int, height: Int): ByteArray {
             val output = ByteArray(input.size)
-            for (y in 0 until height) for (x in 0 until width) output[y * width + (width - 1 - x)] = input[y * width + x]
+            for (y in 0 until height) for (x in 0 until width) output[y * width + (width - 1 - x)] =
+                input[y * width + x]
             return output
         }
+    }
+
+    private fun showDensityDialog(currentValue: Int, onSave: (Int) -> Unit) {
+        val seekBar = SeekBar(this).apply {
+            progress = currentValue - 4 // Ajuste visual
+            max = 20 // Rango de 0 a 20 (real 4 a 24)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Densidad de caracteres")
+            .setView(seekBar)
+            .setPositiveButton("Aceptar") { _, _ ->
+                onSave(seekBar.progress + 4)
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun showPaletteDialog(currentPalette: String, onSave: (String) -> Unit) {
+        val palettes = mapOf(
+            "Clásica" to "@%#*+=-:. ",
+            "Denso" to "\$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ",
+            "Minimal" to " .:-=+*#%@",
+            "Código" to "01 "
+        )
+        val options = palettes.keys.toTypedArray()
+        val currentIndex = options.indexOfFirst { palettes[it] == currentPalette }.coerceAtLeast(0)
+
+        AlertDialog.Builder(this)
+            .setTitle("Seleccionar Paleta")
+            .setSingleChoiceItems(options, currentIndex) { dialog, which ->
+                onSave(palettes[options[which]]!!)
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun showColorDialog(currentColor: Int, onSave: (Int) -> Unit) {
+        val colors = mapOf(
+            "Verde" to Color.parseColor("#00FF00"),
+            "Blanco" to Color.WHITE,
+            "Rojo" to Color.parseColor("#FF3333"),
+            "Azul" to Color.parseColor("#00FFFF"),
+            "Ambar" to Color.parseColor("#FFBF00")
+        )
+        val options = colors.keys.toTypedArray()
+        val currentIndex = options.indexOfFirst { colors[it] == currentColor }.coerceAtLeast(0)
+
+        AlertDialog.Builder(this)
+            .setTitle("Color de caracteres")
+            .setSingleChoiceItems(options, currentIndex) { dialog, which ->
+                onSave(colors[options[which]]!!)
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun restartCamera() {
+        cameraProvider?.unbindAll() // Desvincula cámara actual
+        startCamera() // Vuelve a vincular con la nueva configuración
     }
 }

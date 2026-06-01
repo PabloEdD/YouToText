@@ -12,20 +12,25 @@ class AsciiView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
+    private var asciiText = ""
+    private var lineHeight = 0f
+    private var baseColor = Color.parseColor("#00FF00")
+
     private val paint = Paint().apply {
         typeface = Typeface.MONOSPACE
         isAntiAlias = false
-        color = Color.parseColor("#00FF00")
+        color = baseColor
         textAlign = Paint.Align.LEFT
     }
-
-    private var asciiText = ""
-    private var lineHeight = 0f
-
     fun updateText(text: String) {
         asciiText = text
         if (width > 0 && height > 0) calculateTextSize()
         invalidate()
+    }
+
+    fun setBaseColor(color: Int) {
+        paint.color = color
+        invalidate() // Redibuja con el nuevo color
     }
 
     private fun calculateTextSize() {
@@ -47,7 +52,7 @@ class AsciiView @JvmOverloads constructor(
         paint.textSize = finalSize.coerceAtLeast(10f)
 
         // Recalculamos altura de línea con el tamaño real
-        lineHeight = paint.fontMetrics.run { descent - ascent }
+        lineHeight = baseLineHeight
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {

@@ -62,18 +62,107 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        app:layout_constraintGuide_percent="0.8508892" />
+        app:layout_constraintGuide_percent="0.83" />
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/copyButton"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:id="@+id/actionRow"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:contentDescription="Copiar ASCII"
-        android:src="@drawable/copylink"
+        android:background="#097A00"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingVertical="8dp"
+        app:layout_constraintBottom_toTopOf="@+id/settingsMenu"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/guideline2" />
+        app:layout_constraintTop_toBottomOf="@+id/asciiView">
 
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/copyButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="8dp"
+            android:contentDescription="Copiar al portapapeles"
+            android:src="@drawable/copylink"
+            app:backgroundTint="#333333"
+            app:fabSize="mini"
+            app:tint="#FFFFFF" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/photoButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="8dp"
+            android:contentDescription="Guardar foto"
+            android:src="@drawable/logo"
+            app:backgroundTint="#333333"
+            app:fabSize="mini"
+            app:tint="#FFFFFF" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/switchCamButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="8dp"
+            android:contentDescription="Cambiar cámara"
+            android:src="@drawable/flechas_girando"
+            app:backgroundTint="#333333"
+            app:fabSize="mini"
+            app:tint="#FFFFFF" />
+    </LinearLayout>
+
+    <!-- 🔹 MENÚ HORIZONTAL: Configuración rápida (Texto compacto) -->
+    <LinearLayout
+        android:id="@+id/settingsMenu"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#0A0A0A"
+        android:orientation="horizontal"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/actionRow">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnColor"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:minHeight="40dp"
+            android:text="Color"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            app:backgroundTint="#333333"
+            app:cornerRadius="20dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDensity"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="2dp"
+            android:layout_weight="1"
+            android:minHeight="40dp"
+            android:text="Densidad"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            app:backgroundTint="#333333"
+            app:cornerRadius="20dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPalette"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:minHeight="40dp"
+            android:text="Paleta"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            app:backgroundTint="#333333"
+            app:cornerRadius="20dp" />
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
