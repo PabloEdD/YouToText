@@ -33,4 +33,7 @@ object SettingsPrefs {
     fun updateColor(color: Int) {
         prefs.edit().putInt(COLOR_KEY, color).apply()
     }
+
+    fun isOriginalColorMode() = prefs.getBoolean("original_color", false)
+    fun setOriginalColorMode(enabled: Boolean) = prefs.edit().putBoolean("original_color", enabled).apply()
 }

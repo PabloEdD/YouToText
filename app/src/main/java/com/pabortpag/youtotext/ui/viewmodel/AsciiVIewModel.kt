@@ -2,6 +2,7 @@ package com.pabortpag.youtotext.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.pabortpag.youtotext.data.SettingsPrefs
 import com.pabortpag.youtotext.domain.AsciiMapper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,25 +15,18 @@ class AsciiViewModel : ViewModel() {
     val asciiFrame: StateFlow<String> = _asciiFrame.asStateFlow()
 
     var currentAscii: String = ""
-        private set // Cache del último frame ASCII procesado. Permite acceso rápido desde la UI (ej. botón copiar)
+        private set
+    var currentColors: IntArray? = null // ✅ Array de colores (nullable)
+    var usePixelColor = false           // ✅ Toggle del menú
+    var baseColor = -16711936           // ✅ Color por defecto
 
-    // Configuración UI (persistir con DataStore en Fase 3)
-    var invertColors = false
-
-    /**
-     * Recibe el grid del analyzer, procesa en hilo IO/Default y actualiza StateFlow.
-     */
-    fun onGridReceived(grid: ByteArray, width: Int, height: Int) {
+    fun onGridReceived(grid: ByteArray, colors: IntArray?, width: Int, height: Int) {
         viewModelScope.launch(Dispatchers.Default) {
-            val palette = com.pabortpag.youtotext.data.SettingsPrefs.getPalette()
-
-            val ascii = AsciiMapper.mapToAscii(
-                grid, width, height,
-                palette = palette, // 🔹 Pasar la paleta dinámica
-                invert = invertColors
-            )
+            val palette = SettingsPrefs.getPalette()
+            val ascii = AsciiMapper.mapToAscii(grid, width, height, palette)
             _asciiFrame.value = ascii
             currentAscii = ascii
+            currentColors = colors // Se guarda para la View
         }
     }
 }

@@ -68,7 +68,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 typealias LumaListener = (luma: Double) -> Unit
-typealias LuminanceGridListener = (grid: ByteArray, width: Int, height: Int) -> Unit
+typealias LuminanceGridListener = (grid: ByteArray, colors: IntArray?, width: Int, height: Int) -> Unit
 
 //  __    __               ______        ______                __
 // /\ \  /\ \             /\__  _\      /\__  _\              /\ \__
@@ -168,7 +168,11 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 asciiViewModel.asciiFrame.collectLatest { text ->
-                    asciiView.updateText(text)
+                    binding.asciiView.updateFrame(
+                        text,
+                        asciiViewModel.currentColors,
+                        SettingsPrefs.isOriginalColorMode()
+                    )
                 }
             }
         }
@@ -385,20 +389,15 @@ class MainActivity : AppCompatActivity() {
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                 .build()
                 .also { analysis ->
-                    analysis.setAnalyzer(
-                        cameraExecutor, LuminosityAnalyzer(
-                            listener = { luma -> Log.d(TAG, "Avg luminosity: $luma") },
-                            gridListener = { grid, width, height ->
-                                asciiViewModel.onGridReceived(grid, width, height)
-                                Log.d(
-                                    TAG,
-                                    "ASCII grid ready: ${width}x${height} = ${grid.size} celdas"
-                                )
-                            },
-                            blockFactor = SettingsPrefs.getBlockFactor(),
-                            mirrorHorizontally = useFrontCamera
-                        )
-                    )
+                    analysis.setAnalyzer(cameraExecutor, LuminosityAnalyzer(
+                        listener = { luma -> Log.d(TAG, "Avg luminosity: $luma") },
+                        gridListener = { grid, colors, width, height ->
+                            asciiViewModel.onGridReceived(grid, colors, width, height)
+                        },
+                        blockFactor = SettingsPrefs.getBlockFactor(),
+                        mirrorHorizontally = useFrontCamera,
+                        extractColors = SettingsPrefs.isOriginalColorMode() // 🔹 CLAVE
+                    ))
                 }
 
             val cameraSelector = if (useFrontCamera)
@@ -483,7 +482,8 @@ class MainActivity : AppCompatActivity() {
         private val listener: LumaListener? = null,
         private val gridListener: LuminanceGridListener? = null,
         private val blockFactor: Int = 4,
-        private val mirrorHorizontally: Boolean = false
+        private val mirrorHorizontally: Boolean = false,
+        private val extractColors: Boolean = false // 🔹 NUEVO
     ) : ImageAnalysis.Analyzer {
 
         override fun analyze(image: ImageProxy) {
@@ -493,108 +493,100 @@ class MainActivity : AppCompatActivity() {
                 val yPixelStride = image.planes[0].pixelStride
                 val srcWidth = image.width
                 val srcHeight = image.height
-                val rotation = image.imageInfo.rotationDegrees // detectar rotación
+                val rotation = image.imageInfo.rotationDegrees
 
                 if (listener != null) {
-                    var sum = 0L
-                    var count = 0
-                    var y = 0
-                    while (y < srcHeight) {
-                        var x = 0
-                        while (x < srcWidth) {
-                            val idx = y * yRowStride + x * yPixelStride
-                            sum += yBuffer.get(idx).toInt() and 0xFF
-                            count++
-                            x += yPixelStride // Avanzar según stride real
-                        }
-                        y++
-                    }
+                    var sum = 0L; var count = 0; var y = 0
+                    while (y < srcHeight) { var x = 0; while (x < srcWidth) {
+                        sum += yBuffer.get(y * yRowStride + x * yPixelStride).toInt() and 0xFF
+                        count++; x += yPixelStride }; y++ }
                     listener(if (count > 0) sum.toDouble() / count else 0.0)
                 }
 
-                // Generar grilla para ASCII (solo si hay listener registrado)
                 if (gridListener != null) {
                     val outWidth = (srcWidth + blockFactor - 1) / blockFactor
                     val outHeight = (srcHeight + blockFactor - 1) / blockFactor
                     val grid = ByteArray(outWidth * outHeight)
-                    var outIndex = 0
+                    val colors = if (extractColors) IntArray(outWidth * outHeight) else null // 🔹 Solo si activa
 
-                    var y = 0
-                    while (y < srcHeight) {
-                        var x = 0
-                        while (x < srcWidth) {
-                            var blockSum = 0
-                            var blockCount = 0
+                    // Buffers U/V (solo se leen si extractColors == true)
+                    val uPlane = image.planes[1]; val vPlane = image.planes[2]
+                    val uBuffer = uPlane.buffer; val vBuffer = vPlane.buffer
+                    val uRowStride = uPlane.rowStride; val vRowStride = vPlane.rowStride
+                    val uPixelStride = uPlane.pixelStride; val vPixelStride = vPlane.pixelStride
 
-                            var dy = 0
-                            while (dy < blockFactor && (y + dy) < srcHeight) {
-                                var dx = 0
-                                while (dx < blockFactor && (x + dx) < srcWidth) {
-                                    val bufIdx = (y + dy) * yRowStride + (x + dx) * yPixelStride
-                                    blockSum += yBuffer.get(bufIdx).toInt() and 0xFF
-                                    blockCount++
-                                    dx++
-                                }
-                                dy++
-                            }
+                    var idx = 0; var by = 0
+                    while (by < outHeight) { var bx = 0; while (bx < outWidth) {
+                        val cx = minOf(bx * blockFactor + blockFactor / 2, srcWidth - 1)
+                        val cy = minOf(by * blockFactor + blockFactor / 2, srcHeight - 1)
+                        val y = yBuffer.get(cy * yRowStride + cx).toInt() and 0xFF
 
-                            grid[outIndex++] = (blockSum / blockCount).toByte()
-                            x += blockFactor
+                        var r = 255; var g = 255; var b = 255
+                        if (extractColors) {
+                            val ux = cx / 2; val uy = cy / 2
+                            val u = uBuffer.get(uy * uRowStride + ux * uPixelStride).toInt() and 0xFF
+                            val v = vBuffer.get(uy * vRowStride + ux * vPixelStride).toInt() and 0xFF
+                            val c = y - 16; val d = u - 128; val e = v - 128
+                            r = ((298 * c + 409 * e + 128) shr 8).coerceIn(0, 255)
+                            g = ((298 * c - 100 * d - 208 * e + 128) shr 8).coerceIn(0, 255)
+                            b = ((298 * c + 516 * d + 128) shr 8).coerceIn(0, 255)
+                            colors!![idx] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
                         }
-                        y += blockFactor
-                    }
+                        grid[idx++] = y.toByte()
+                        bx++
+                    }; by++ }
 
-                    val rotatedGrid: ByteArray
-                    val rotatedW: Int
-                    val rotatedH: Int
+                    // Geometría (igual que antes)
+                    var tempGrid = grid
+                    var tempColors = colors // Nullable según extractColors
+                    var tempW = outWidth
+                    var tempH = outHeight
 
+                    // 1. Rotación/Transposición (90°/270°)
                     if (rotation == 90 || rotation == 270) {
-                        rotatedGrid = ByteArray(grid.size)
-                        for (y in 0 until outHeight) {
-                            for (x in 0 until outWidth) {
-                                rotatedGrid[x * outHeight + y] = grid[y * outWidth + x]
+                        val newGrid = ByteArray(tempGrid.size)
+                        val newColors = if (tempColors != null) IntArray(tempColors.size) else null
+                        for (y in 0 until tempH) {
+                            for (x in 0 until tempW) {
+                                newGrid[x * tempH + y] = tempGrid[y * tempW + x]
+                                if (newColors != null) newColors[x * tempH + y] = tempColors!![y * tempW + x]
                             }
                         }
-                        rotatedW = outHeight
-                        rotatedH = outWidth
-                    } else {
-                        rotatedGrid = grid
-                        rotatedW = outWidth
-                        rotatedH = outHeight
+                        tempGrid = newGrid
+                        tempColors = newColors
+                        val aux = tempW; tempW = tempH; tempH = aux
                     }
 
-                    val flippedGrid = ByteArray(rotatedGrid.size)
-                    for (y in 0 until rotatedH) {
-                        for (x in 0 until rotatedW) {
-                            flippedGrid[y * rotatedW + (rotatedW - 1 - x)] = rotatedGrid[y * rotatedW + x]
+                    // 2. Volteo Horizontal (Corrección base para TODAS las cámaras)
+                    val flipHGrid = ByteArray(tempGrid.size)
+                    val flipHColors = if (tempColors != null) IntArray(tempColors.size) else null
+                    for (y in 0 until tempH) {
+                        for (x in 0 until tempW) {
+                            flipHGrid[y * tempW + (tempW - 1 - x)] = tempGrid[y * tempW + x]
+                            if (flipHColors != null) flipHColors[y * tempW + (tempW - 1 - x)] = tempColors!![y * tempW + x]
                         }
                     }
+                    tempGrid = flipHGrid
+                    tempColors = flipHColors
 
-                    val outputGrid: ByteArray
-                    val finalW = rotatedW
-                    val finalH = rotatedH
-
+                    // 3. Volteo Vertical (SOLO cámara frontal)
                     if (mirrorHorizontally) {
-                        outputGrid = ByteArray(flippedGrid.size)
-                        for (y in 0 until finalH) {
-                            for (x in 0 until finalW) {
-                                outputGrid[(finalH - 1 - y) * finalW + x] = flippedGrid[y * finalW + x]
+                        val finalGrid = ByteArray(tempGrid.size)
+                        val finalColors = if (tempColors != null) IntArray(tempColors.size) else null
+                        for (y in 0 until tempH) {
+                            for (x in 0 until tempW) {
+                                finalGrid[(tempH - 1 - y) * tempW + x] = tempGrid[y * tempW + x]
+                                if (finalColors != null) finalColors[(tempH - 1 - y) * tempW + x] = tempColors!![y * tempW + x]
                             }
                         }
-                    } else {
-                        outputGrid = flippedGrid
+                        tempGrid = finalGrid
+                        tempColors = finalColors
                     }
 
-                    gridListener(outputGrid, finalW, finalH)
-                    Log.d("Grid", "Grid: $outputGrid, W: $finalW, H: $finalH")
-                    Log.d(
-                        "Frame",
-                        "Frame: ${image.width}x${image.height} | Grid: ${outWidth}x${outHeight} | Rot: $rotation°"
-                    )
+                    // Enviamos grid y colores YA alineados espacialmente
+                    gridListener(tempGrid, tempColors, tempW, tempH)
                 }
-            } finally {
-                image.close()
-            }
+            } finally { image.close() }
         }
     }
 
@@ -635,19 +627,30 @@ class MainActivity : AppCompatActivity() {
 
     private fun showColorDialog(currentColor: Int, onSave: (Int) -> Unit) {
         val colors = mapOf(
+            "Color Original" to -2,
             "Verde" to Color.parseColor("#00FF00"),
             "Blanco" to Color.WHITE,
             "Rojo" to Color.parseColor("#FF3333"),
             "Azul" to Color.parseColor("#00FFFF"),
-            "Ambar" to Color.parseColor("#FFBF00")
+            "Ámbar" to Color.parseColor("#FFBF00")
         )
         val options = colors.keys.toTypedArray()
-        val currentIndex = options.indexOfFirst { colors[it] == currentColor }.coerceAtLeast(0)
+        val currentIsOriginal = SettingsPrefs.isOriginalColorMode()
+        val currentIndex = if (currentIsOriginal) 0 else options.indexOfFirst { colors[it] == currentColor }.coerceAtLeast(1)
 
         AlertDialog.Builder(this)
             .setTitle("Color de caracteres")
             .setSingleChoiceItems(options, currentIndex) { dialog, which ->
-                onSave(colors[options[which]]!!)
+                val selectedValue = colors[options[which]]!!
+                if (selectedValue == -2) {
+                    SettingsPrefs.setOriginalColorMode(true)
+                    restartCamera() // Extrae U/V en el siguiente frame
+                } else {
+                    SettingsPrefs.setOriginalColorMode(false)
+                    SettingsPrefs.updateColor(selectedValue)
+                    binding.asciiView.setBaseColor(selectedValue) // 🔹 Aplica color en vivo
+                    restartCamera() // Apaga extracción U/V para ahorrar CPU
+                }
                 dialog.dismiss()
             }
             .show()
