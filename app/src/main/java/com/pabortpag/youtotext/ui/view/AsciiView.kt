@@ -42,7 +42,6 @@ class AsciiView @JvmOverloads constructor(
         // 🔹 1. Medimos proporciones reales a un tamaño base seguro (20f)
         paint.textSize = 20f
         val baseCharWidth = paint.measureText("M")
-        val baseLineHeight = paint.fontMetrics.run { descent - ascent }
 
         // 🔹 2. Calculamos el tamaño exacto para que llene el ANCHO de la pantalla
         // Fórmula directa: AnchoPantalla / (Columnas * AnchoCaracterUnitario)
@@ -52,7 +51,7 @@ class AsciiView @JvmOverloads constructor(
         paint.textSize = finalSize.coerceAtLeast(10f)
 
         // Recalculamos altura de línea con el tamaño real
-        lineHeight = baseLineHeight
+        lineHeight = paint.fontMetrics.run { descent - ascent }
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {

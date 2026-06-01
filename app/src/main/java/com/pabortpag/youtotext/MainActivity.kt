@@ -81,6 +81,7 @@ class MainActivity : AppCompatActivity() {
     private var recording: Recording? = null
     private val asciiViewModel: AsciiViewModel by lazy { AsciiViewModel() }
     private var cameraProvider: ProcessCameraProvider? = null
+    private var useFrontCamera = false
 
     private lateinit var cameraExecutor: ExecutorService
 
@@ -112,6 +113,10 @@ class MainActivity : AppCompatActivity() {
         binding.imageCaptureButton.setOnClickListener { takePhoto() }
         binding.videoCaptureButton.setOnClickListener { captureVideo() }
         binding.copyButton.setOnClickListener { copyAsciiToClipboard(asciiViewModel.currentAscii) }
+        binding.switchCamButton.setOnClickListener {
+            useFrontCamera = !useFrontCamera
+            restartCamera()
+        }
 
         if (allPermissionsGranted()) startCamera() else requestPermissions()
         cameraExecutor = Executors.newSingleThreadExecutor()
@@ -292,7 +297,7 @@ class MainActivity : AppCompatActivity() {
 
         cameraProviderFuture.addListener({
             // Used to bind the lifecycle of cameras to the lifecycle owner
-            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+            cameraProvider = cameraProviderFuture.get()
 
             // Preview
             val preview = Preview.Builder()
@@ -338,21 +343,23 @@ class MainActivity : AppCompatActivity() {
                                 )
                             },
                             blockFactor = SettingsPrefs.getBlockFactor(),
-                            mirrorHorizontally = true
+                            mirrorHorizontally = useFrontCamera
                         )
                     )
                 }
 
-            // Select back camera as a default
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+            val cameraSelector = if (useFrontCamera)
+                CameraSelector.DEFAULT_FRONT_CAMERA
+            else
+                CameraSelector.DEFAULT_BACK_CAMERA
 
             try {
                 // Unbind use cases before rebinding
-                cameraProvider.unbindAll()
+                cameraProvider?.unbindAll()
 
                 // Bind use cases to camera
 //                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, videoCapture)
-                cameraProvider.bindToLifecycle(
+                cameraProvider?.bindToLifecycle(
                     this,
                     cameraSelector,
                     preview,
@@ -484,18 +491,46 @@ class MainActivity : AppCompatActivity() {
                         y += blockFactor
                     }
 
-                    val finalGrid: ByteArray;
-                    var finalW: Int;
-                    var finalH: Int
+                    val rotatedGrid: ByteArray
+                    val rotatedW: Int
+                    val rotatedH: Int
+
                     if (rotation == 90 || rotation == 270) {
-                        finalGrid = transposeGrid(grid, outWidth, outHeight)
-                        finalW = outHeight; finalH = outWidth
+                        rotatedGrid = ByteArray(grid.size)
+                        for (y in 0 until outHeight) {
+                            for (x in 0 until outWidth) {
+                                rotatedGrid[x * outHeight + y] = grid[y * outWidth + x]
+                            }
+                        }
+                        rotatedW = outHeight
+                        rotatedH = outWidth
                     } else {
-                        finalGrid = grid; finalW = outWidth; finalH = outHeight
+                        rotatedGrid = grid
+                        rotatedW = outWidth
+                        rotatedH = outHeight
                     }
 
-                    val outputGrid =
-                        if (mirrorHorizontally) mirrorGrid(finalGrid, finalW, finalH) else finalGrid
+                    val flippedGrid = ByteArray(rotatedGrid.size)
+                    for (y in 0 until rotatedH) {
+                        for (x in 0 until rotatedW) {
+                            flippedGrid[y * rotatedW + (rotatedW - 1 - x)] = rotatedGrid[y * rotatedW + x]
+                        }
+                    }
+
+                    val outputGrid: ByteArray
+                    val finalW = rotatedW
+                    val finalH = rotatedH
+
+                    if (mirrorHorizontally) {
+                        outputGrid = ByteArray(flippedGrid.size)
+                        for (y in 0 until finalH) {
+                            for (x in 0 until finalW) {
+                                outputGrid[(finalH - 1 - y) * finalW + x] = flippedGrid[y * finalW + x]
+                            }
+                        }
+                    } else {
+                        outputGrid = flippedGrid
+                    }
 
                     gridListener(outputGrid, finalW, finalH)
                     Log.d("Grid", "Grid: $outputGrid, W: $finalW, H: $finalH")
@@ -507,23 +542,6 @@ class MainActivity : AppCompatActivity() {
             } finally {
                 image.close()
             }
-        }
-
-        private fun transposeGrid(input: ByteArray, width: Int, height: Int): ByteArray {
-            val output = ByteArray(input.size)
-            for (y in 0 until height) {
-                for (x in 0 until width) {
-                    output[x * height + y] = input[y * width + x]
-                }
-            }
-            return output
-        }
-
-        private fun mirrorGrid(input: ByteArray, width: Int, height: Int): ByteArray {
-            val output = ByteArray(input.size)
-            for (y in 0 until height) for (x in 0 until width) output[y * width + (width - 1 - x)] =
-                input[y * width + x]
-            return output
         }
     }
 

@@ -67,8 +67,8 @@
     <LinearLayout
         android:id="@+id/actionRow"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="#097A00"
+        android:layout_height="0dp"
+        android:background="#0A0A0A"
         android:gravity="center"
         android:orientation="horizontal"
         android:paddingVertical="8dp"
@@ -115,7 +115,7 @@
     <LinearLayout
         android:id="@+id/settingsMenu"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:background="#0A0A0A"
         android:orientation="horizontal"
         android:paddingHorizontal="6dp"
