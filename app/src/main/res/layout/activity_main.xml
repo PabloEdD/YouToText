@@ -163,6 +163,19 @@
             android:textSize="13sp"
             app:backgroundTint="#333333"
             app:cornerRadius="20dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnGallery"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:minHeight="40dp"
+            android:text="Galeria"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            app:backgroundTint="#333333"
+            app:cornerRadius="20dp" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

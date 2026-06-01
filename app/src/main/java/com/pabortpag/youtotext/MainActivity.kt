@@ -4,19 +4,16 @@ import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
-import android.content.Context
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
-import android.media.Image
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
 import android.util.Size
-import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -39,20 +36,16 @@ import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.ContextCompat
 import androidx.core.content.PermissionChecker
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.bumptech.glide.Glide
 import com.pabortpag.youtotext.databinding.ActivityMainBinding
-import com.pabortpag.youtotext.ui.view.AsciiView
 import com.pabortpag.youtotext.ui.viewmodel.AsciiViewModel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.ExecutorService
@@ -62,10 +55,14 @@ import android.widget.SeekBar
 import android.graphics.Color
 import android.net.Uri
 import android.view.View
+import androidx.lifecycle.ViewModelProvider
 import com.pabortpag.youtotext.data.SettingsPrefs
+import com.pabortpag.youtotext.data.room.YouToTextDatabase
+import com.pabortpag.youtotext.ui.viewmodel.GalleryViewModel
+import com.pabortpag.youtotext.ui.viewmodel.GalleryViewModelFactory
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlin.jvm.java
 
 typealias LumaListener = (luma: Double) -> Unit
 typealias LuminanceGridListener = (grid: ByteArray, colors: IntArray?, width: Int, height: Int) -> Unit
@@ -88,6 +85,9 @@ class MainActivity : AppCompatActivity() {
     private var cameraProvider: ProcessCameraProvider? = null
     private var useFrontCamera = false
 
+    lateinit var db: YouToTextDatabase
+    lateinit var galleryViewModel: GalleryViewModel
+
     private lateinit var cameraExecutor: ExecutorService
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -98,6 +98,11 @@ class MainActivity : AppCompatActivity() {
         SettingsPrefs.init(this)
 
         binding.asciiView.setBaseColor(SettingsPrefs.getColor())
+
+        db = YouToTextDatabase.getInstance(this)
+        val dao = db.asciiDao()
+        galleryViewModel = ViewModelProvider(this, GalleryViewModelFactory(dao))
+            .get(GalleryViewModel::class.java)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val insetsController = WindowInsetsControllerCompat(window, binding.root)
@@ -117,20 +122,30 @@ class MainActivity : AppCompatActivity() {
         // Set UP THE LISTENERS FOR TAKE PHOTO AND VIDEO CAPTURE BUTTONS
         binding.imageCaptureButton.setOnClickListener { takePhoto() }
         binding.videoCaptureButton.setOnClickListener { captureVideo() }
-        binding.copyButton.setOnClickListener { copyAsciiToClipboard(asciiViewModel.currentAscii) }
+        binding.copyButton.setOnClickListener {
+            val text = asciiViewModel.currentAscii
+            if (text.isEmpty()) return@setOnClickListener
+
+            copyAsciiToClipboard(text)
+            galleryViewModel.saveRecord(
+                text, SettingsPrefs.getColor(), SettingsPrefs.getBlockFactor(), SettingsPrefs.getPalette()
+            )
+        }
         binding.switchCamButton.setOnClickListener {
             useFrontCamera = !useFrontCamera
             restartCamera()
         }
         binding.photoButton.setOnClickListener {
+            val text = asciiViewModel.currentAscii
+            if (text.isEmpty()) return@setOnClickListener
+
             lifecycleScope.launch {
-                binding.photoButton.isEnabled = false // Evita pulsos múltiples
                 val success = exportAsciiViewToPng(binding.asciiView)
-
-                val msg = if (success) "Imagen guardada en Galería" else "Error al guardar"
-                Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
-
-                binding.photoButton.isEnabled = true
+                if (success) {
+                    galleryViewModel.saveRecord(
+                        text, SettingsPrefs.getColor(), SettingsPrefs.getBlockFactor(), SettingsPrefs.getPalette()
+                    )
+                }
             }
         }
 
@@ -160,6 +175,8 @@ class MainActivity : AppCompatActivity() {
                 binding.asciiView.setBaseColor(newColor) // Aplica color al vuelo
             }
         }
+
+        binding.btnGallery.setOnClickListener { startActivity(Intent(this, GalleryActivity::class.java)) }
 
         // 🔹 Observación segura al ciclo de vida
         val asciiView = binding.asciiView
@@ -307,7 +324,7 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Esperando primer frame ASCII...", Toast.LENGTH_SHORT).show()
             return
         }
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText("YouToText ASCII", text)
         clipboard.setPrimaryClip(clip)
     }
