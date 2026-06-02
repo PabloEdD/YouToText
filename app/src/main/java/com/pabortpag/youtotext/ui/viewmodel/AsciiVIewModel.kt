@@ -16,9 +16,9 @@ class AsciiViewModel : ViewModel() {
 
     var currentAscii: String = ""
         private set
-    var currentColors: IntArray? = null // ✅ Array de colores (nullable)
-    var usePixelColor = false           // ✅ Toggle del menú
-    var baseColor = -16711936           // ✅ Color por defecto
+    var currentColors: IntArray? = null
+    var usePixelColor = false
+    var baseColor = -16711936
 
     fun onGridReceived(grid: ByteArray, colors: IntArray?, width: Int, height: Int) {
         viewModelScope.launch(Dispatchers.Default) {

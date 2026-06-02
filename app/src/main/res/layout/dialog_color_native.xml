@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="#1E1E1E">
+
+    <CheckBox
+        android:id="@+id/cbOriginalColor"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Usar Color Original (Píxel real)"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:layout_marginBottom="16dp" />
+
+    <LinearLayout
+        android:id="@+id/rgbContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Rojo -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Rojo" android:textColor="#FF5555" android:textSize="14sp" android:layout_marginEnd="8dp"/>
+            <SeekBar android:id="@+id/seekR" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:max="255" android:progressTint="#FF5555" android:thumbTint="#FF5555"/>
+            <TextView android:id="@+id/tvR" android:layout_width="40dp" android:layout_height="wrap_content" android:text="0" android:textColor="#FF5555" android:textSize="14sp" android:textStyle="bold" android:gravity="end"/>
+        </LinearLayout>
+
+        <!-- Verde -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="12dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Verde" android:textColor="#55FF55" android:textSize="14sp" android:layout_marginEnd="8dp"/>
+            <SeekBar android:id="@+id/seekG" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:max="255" android:progressTint="#55FF55" android:thumbTint="#55FF55"/>
+            <TextView android:id="@+id/tvG" android:layout_width="40dp" android:layout_height="wrap_content" android:text="0" android:textColor="#55FF55" android:textSize="14sp" android:textStyle="bold" android:gravity="end"/>
+        </LinearLayout>
+
+        <!-- Azul -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="12dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Azul" android:textColor="#5555FF" android:textSize="14sp" android:layout_marginEnd="8dp"/>
+            <SeekBar android:id="@+id/seekB" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:max="255" android:progressTint="#5555FF" android:thumbTint="#5555FF"/>
+            <TextView android:id="@+id/tvB" android:layout_width="40dp" android:layout_height="wrap_content" android:text="0" android:textColor="#5555FF" android:textSize="14sp" android:textStyle="bold" android:gravity="end"/>
+        </LinearLayout>
+
+        <!-- Vista previa del color seleccionado -->
+        <View
+            android:id="@+id/colorPreview"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="20dp"
+            android:background="#00FF00" />
+
+        <TextView
+            android:id="@+id/tvHex"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="#00FF00"
+            android:textSize="14sp"
+            android:textColor="#AAAAAA"
+            android:gravity="center"
+            android:layout_marginTop="8dp" />
+    </LinearLayout>
+</LinearLayout>

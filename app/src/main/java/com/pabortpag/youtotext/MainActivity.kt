@@ -9,6 +9,7 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -52,9 +53,11 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import androidx.appcompat.app.AlertDialog
 import android.widget.SeekBar
-import android.graphics.Color
 import android.net.Uri
 import android.view.View
+import android.widget.CheckBox
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.lifecycle.ViewModelProvider
 import com.pabortpag.youtotext.data.SettingsPrefs
 import com.pabortpag.youtotext.data.room.YouToTextDatabase
@@ -153,11 +156,7 @@ class MainActivity : AppCompatActivity() {
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         binding.btnDensity.setOnClickListener {
-            val current = SettingsPrefs.getBlockFactor()
-            showDensityDialog(current) { newFactor ->
-                SettingsPrefs.updateBlockFactor(newFactor)
-                restartCamera()
-            }
+            showDensityDialog()
         }
 
         binding.btnPalette.setOnClickListener {
@@ -169,11 +168,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnColor.setOnClickListener {
-            val current = SettingsPrefs.getColor()
-            showColorDialog(current) { newColor ->
-                SettingsPrefs.updateColor(newColor)
-                binding.asciiView.setBaseColor(newColor) // Aplica color al vuelo
-            }
+            showColorDialog()
         }
 
         binding.btnGallery.setOnClickListener { startActivity(Intent(this, GalleryActivity::class.java)) }
@@ -607,17 +602,35 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showDensityDialog(currentValue: Int, onSave: (Int) -> Unit) {
-        val seekBar = SeekBar(this).apply {
-            progress = currentValue - 4 // Ajuste visual
-            max = 20 // Rango de 0 a 20 (real 4 a 24)
-        }
+    private fun showDensityDialog() {
+        // 1. Inflar el layout personalizado
+        val dialogView = layoutInflater.inflate(R.layout.dialog_density, null)
+        val tvDensityValue = dialogView.findViewById<TextView>(R.id.tvDensityValue)
+        val seekBar = dialogView.findViewById<SeekBar>(R.id.seekBarDensity)
 
+        // 2. Obtener valor actual y ajustarlo al rango del SeekBar (0 a 20)
+        val currentDensity = SettingsPrefs.getBlockFactor()
+        seekBar.progress = currentDensity - 4
+        tvDensityValue.text = "Tamaño de bloque: $currentDensity"
+
+        // 3. Actualizar el texto en tiempo real mientras se mueve la barra
+        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val realValue = progress + 4 // Convertimos 0-20 a 4-24
+                tvDensityValue.text = "Tamaño de bloque: $realValue"
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        // 4. Construir y mostrar el diálogo
         AlertDialog.Builder(this)
-            .setTitle("Densidad de caracteres")
-            .setView(seekBar)
-            .setPositiveButton("Aceptar") { _, _ ->
-                onSave(seekBar.progress + 4)
+            .setView(dialogView)
+            .setPositiveButton("Aplicar") { dialog, _ ->
+                val newDensity = seekBar.progress + 4
+                SettingsPrefs.updateBlockFactor(newDensity) // ✅ Corregido: updateBlockFactor en lugar de setBlockFactor
+                restartCamera() // Reinicia la cámara para aplicar el nuevo blockFactor
+                dialog.dismiss()
             }
             .setNegativeButton("Cancelar", null)
             .show()
@@ -642,35 +655,84 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showColorDialog(currentColor: Int, onSave: (Int) -> Unit) {
-        val colors = mapOf(
-            "Color Original" to -2,
-            "Verde" to Color.parseColor("#00FF00"),
-            "Blanco" to Color.WHITE,
-            "Rojo" to Color.parseColor("#FF3333"),
-            "Azul" to Color.parseColor("#00FFFF"),
-            "Ámbar" to Color.parseColor("#FFBF00")
-        )
-        val options = colors.keys.toTypedArray()
-        val currentIsOriginal = SettingsPrefs.isOriginalColorMode()
-        val currentIndex = if (currentIsOriginal) 0 else options.indexOfFirst { colors[it] == currentColor }.coerceAtLeast(1)
+    private fun showColorDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_color_native, null)
+
+        val cbOriginal = dialogView.findViewById<CheckBox>(R.id.cbOriginalColor)
+        val rgbContainer = dialogView.findViewById<LinearLayout>(R.id.rgbContainer)
+
+        val seekR = dialogView.findViewById<SeekBar>(R.id.seekR)
+        val seekG = dialogView.findViewById<SeekBar>(R.id.seekG)
+        val seekB = dialogView.findViewById<SeekBar>(R.id.seekB)
+
+        // ✅ Nuevos TextViews para los números
+        val tvR = dialogView.findViewById<TextView>(R.id.tvR)
+        val tvG = dialogView.findViewById<TextView>(R.id.tvG)
+        val tvB = dialogView.findViewById<TextView>(R.id.tvB)
+
+        val colorPreview = dialogView.findViewById<View>(R.id.colorPreview)
+        val tvHex = dialogView.findViewById<TextView>(R.id.tvHex)
+
+        val isOriginal = SettingsPrefs.isOriginalColorMode()
+        val currentColor = SettingsPrefs.getColor()
+
+        cbOriginal.isChecked = isOriginal
+        rgbContainer.visibility = if (isOriginal) View.GONE else View.VISIBLE
+
+        seekR.progress = Color.red(currentColor)
+        seekG.progress = Color.green(currentColor)
+        seekB.progress = Color.blue(currentColor)
+
+        // ✅ Pasamos los nuevos TextViews a la función de actualización
+        updatePreview(colorPreview, tvHex, tvR, tvG, tvB, seekR.progress, seekG.progress, seekB.progress)
+
+        val seekBarListener = object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                // ✅ Se actualiza todo en tiempo real al mover cualquier barra
+                updatePreview(colorPreview, tvHex, tvR, tvG, tvB, seekR.progress, seekG.progress, seekB.progress)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        }
+
+        seekR.setOnSeekBarChangeListener(seekBarListener)
+        seekG.setOnSeekBarChangeListener(seekBarListener)
+        seekB.setOnSeekBarChangeListener(seekBarListener)
+
+        cbOriginal.setOnCheckedChangeListener { _, isChecked ->
+            rgbContainer.visibility = if (isChecked) View.GONE else View.VISIBLE
+        }
 
         AlertDialog.Builder(this)
-            .setTitle("Color de caracteres")
-            .setSingleChoiceItems(options, currentIndex) { dialog, which ->
-                val selectedValue = colors[options[which]]!!
-                if (selectedValue == -2) {
+            .setTitle("Configurar Color")
+            .setView(dialogView)
+            .setPositiveButton("Aplicar") { dialog, _ ->
+                if (cbOriginal.isChecked) {
                     SettingsPrefs.setOriginalColorMode(true)
-                    restartCamera() // Extrae U/V en el siguiente frame
+                    restartCamera()
                 } else {
                     SettingsPrefs.setOriginalColorMode(false)
-                    SettingsPrefs.updateColor(selectedValue)
-                    binding.asciiView.setBaseColor(selectedValue) // 🔹 Aplica color en vivo
-                    restartCamera() // Apaga extracción U/V para ahorrar CPU
+                    val selectedColor = Color.rgb(seekR.progress, seekG.progress, seekB.progress)
+                    SettingsPrefs.updateColor(selectedColor)
+                    binding.asciiView.setBaseColor(selectedColor)
                 }
                 dialog.dismiss()
             }
+            .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    // ✅ Función actualizada para incluir los números
+    private fun updatePreview(preview: View, tvHex: TextView, tvR: TextView, tvG: TextView, tvB: TextView, r: Int, g: Int, b: Int) {
+        val color = Color.rgb(r, g, b)
+        preview.setBackgroundColor(color)
+        tvHex.text = String.format("#%02X%02X%02X", r, g, b)
+        tvHex.setTextColor(color)
+
+        // Actualizar los valores numéricos al lado de las barras
+        tvR.text = r.toString()
+        tvG.text = g.toString()
+        tvB.text = b.toString()
     }
 
     private fun restartCamera() {

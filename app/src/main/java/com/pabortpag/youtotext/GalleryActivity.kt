@@ -3,6 +3,7 @@ package com.pabortpag.youtotext
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Bundle
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -47,7 +48,16 @@ class GalleryActivity : AppCompatActivity() {
         binding.recyclerView.adapter = adapter
 
         lifecycleScope.launch {
-            viewModel.galleryItems.collect { list -> adapter.submitList(list) }
+            viewModel.galleryItems.collect { list ->
+                if (list.isEmpty()) {
+                    binding.tvEmptyState.visibility = View.VISIBLE
+                    binding.recyclerView.visibility = View.GONE
+                } else {
+                    binding.tvEmptyState.visibility = View.GONE
+                    binding.recyclerView.visibility = View.VISIBLE
+                }
+                adapter.submitList(list)
+            }
         }
     }
 }

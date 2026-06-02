@@ -135,6 +135,8 @@
             android:text="Color"
             android:textColor="#FFFFFF"
             android:textSize="13sp"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="4dp"
             app:backgroundTint="#333333"
             app:cornerRadius="20dp" />
 
@@ -148,6 +150,8 @@
             android:text="Densidad"
             android:textColor="#FFFFFF"
             android:textSize="13sp"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="4dp"
             app:backgroundTint="#333333"
             app:cornerRadius="20dp" />
 
@@ -161,6 +165,8 @@
             android:text="Paleta"
             android:textColor="#FFFFFF"
             android:textSize="13sp"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="4dp"
             app:backgroundTint="#333333"
             app:cornerRadius="20dp" />
 
@@ -174,6 +180,8 @@
             android:text="Galeria"
             android:textColor="#FFFFFF"
             android:textSize="13sp"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="4dp"
             app:backgroundTint="#333333"
             app:cornerRadius="20dp" />
     </LinearLayout>
