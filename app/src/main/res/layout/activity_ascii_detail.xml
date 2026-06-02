@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".AsciiDetailActivity"
-    android:background="#0A0A0A">
+    android:background="#000000"
+    tools:context=".AsciiDetailActivity">
 
+    <!-- Vista que renderiza el texto ASCII -->
     <com.pabortpag.youtotext.ui.view.AsciiView
         android:id="@+id/asciiView"
         android:layout_width="0dp"
@@ -18,48 +20,79 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Barra de acciones inferiores -->
     <LinearLayout
         android:id="@+id/bottomActions"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="8dp"
+        android:padding="12dp"
         android:background="#111111"
+        android:elevation="8dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
+        <!-- Botón Copiar -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnCopy"
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:minHeight="48dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
             android:text="Copiar"
-            android:textSize="13sp"
-            android:layout_marginEnd="4dp"
-            app:cornerRadius="20dp" />
+            android:textSize="12sp"
+            android:maxLines="1"
+            android:ellipsize="none"
+            app:cornerRadius="20dp"
+            app:icon="@drawable/ic_copy"
+            app:iconGravity="textStart"
+            app:iconPadding="6dp"
+            app:iconSize="18dp" />
 
+        <!-- Botón Exportar PNG -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDownload"
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginHorizontal="6dp"
+            android:minHeight="48dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
             android:text="PNG"
-            android:textSize="13sp"
-            android:layout_marginHorizontal="2dp"
-            app:cornerRadius="20dp" />
+            android:textSize="12sp"
+            android:maxLines="1"
+            app:cornerRadius="20dp"
+            app:icon="@drawable/ic_download"
+            app:iconGravity="textStart"
+            app:iconPadding="6dp"
+            app:iconSize="18dp" />
 
+        <!-- Botón Eliminar (acción destructiva) -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDelete"
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Eliminar"
+            android:layout_marginStart="6dp"
+            android:minHeight="48dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="Borrar"
             android:textColor="#FF5555"
-            android:textSize="13sp"
-            android:layout_marginStart="4dp"
+            android:textSize="12sp"
+            android:maxLines="1"
             app:cornerRadius="20dp"
+            app:icon="@drawable/ic_delete"
+            app:iconGravity="textStart"
+            app:iconPadding="6dp"
+            app:iconSize="18dp"
+            app:iconTint="#FF5555"
             app:strokeColor="#FF5555" />
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

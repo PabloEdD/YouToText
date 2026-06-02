@@ -5,10 +5,14 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.pabortpag.youtotext.util.AsciiCanvasRenderer
 import com.pabortpag.youtotext.data.room.AsciiRecord
 import com.pabortpag.youtotext.databinding.ItemGalleryBinding
-import kotlinx.coroutines.*
+import com.pabortpag.youtotext.util.AsciiCanvasRenderer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class GalleryAdapter(
     private val onItemClick: (AsciiRecord) -> Unit
@@ -25,12 +29,25 @@ class GalleryAdapter(
 
     inner class ViewHolder(private val binding: ItemGalleryBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(record: AsciiRecord) {
-            CoroutineScope(Dispatchers.IO).launch {
-                val bmp = AsciiCanvasRenderer.renderToBitmap(record.asciiText, record.color, 400, 300)
-                withContext(Dispatchers.Main) {
-                    binding.ivPreview.setImageBitmap(bmp)
+            // Scope seguro e independiente para evitar problemas de LifecycleOwner en el Adapter
+            val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+            scope.launch {
+                try {
+                    val bmp = AsciiCanvasRenderer.renderPreviewBitmap(
+                        asciiText = record.asciiText,
+                        baseColor = record.baseColor,
+                        targetWidthPx = 250,
+                        targetHeightPx = 500
+                    )
+                    withContext(Dispatchers.Main) {
+                        binding.ivPreview.setImageBitmap(bmp)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace() // Si hay error, lo verás en el Logcat
                 }
             }
+
             binding.root.setOnClickListener { onItemClick(record) }
         }
     }

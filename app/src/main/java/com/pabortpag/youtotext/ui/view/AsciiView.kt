@@ -8,17 +8,22 @@ import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.View
 
+// Vista personalizada que renderiza el texto ASCII carácter a carácter
 class AsciiView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
+    // === ESTADO DEL FRAME ACTUAL ===
     private var asciiText = ""
-    private var lineHeight = 0f
-    private var baseColor = Color.parseColor("#00FF00")
+    private var frameColors: IntArray? = null
     private var useOriginalMode = false
-    private var colors: IntArray? = null
-    private var charAdvance = 12f
 
+    // === MÉTRICAS DE DIBUJADO ===
+    private var lineHeight = 0f
+    private var characterWidth = 12f
+    private var baseColor = Color.parseColor("#00FF00")
+
+    // Paint reutilizable para evitar crear objetos en cada frame
     private val paint = Paint().apply {
         typeface = Typeface.MONOSPACE
         isAntiAlias = false
@@ -26,49 +31,53 @@ class AsciiView @JvmOverloads constructor(
         textAlign = Paint.Align.LEFT
     }
 
+    // Actualiza el frame ASCII completo y fuerza el redibujado
     fun updateFrame(text: String, colors: IntArray?, useOriginal: Boolean) {
-        this.colors = colors
-        this.useOriginalMode = useOriginal
         asciiText = text
+        frameColors = colors
+        useOriginalMode = useOriginal
 
-        // 🔹 Limpia el array si no se usa para evitar referencias fantasma y ahorrar RAM
-        if (!useOriginal) this.colors = null
+        // Libera memoria si no se usa el modo original
+        if (!useOriginal) frameColors = null
 
-        if (width > 0 && height > 0) calculateTextSize()
+        if (width > 0 && height > 0) recalculateTextMetrics()
         invalidate()
     }
 
+    // Cambia el color base y redibuja inmediatamente
     fun setBaseColor(color: Int) {
         if (baseColor != color) {
             baseColor = color
-            paint.color = color // Sincroniza el Paint inmediatamente
-            invalidate()        // Fuerza redraw sin esperar nuevo frame ASCII
+            paint.color = color
+            invalidate()
         }
     }
 
-    private fun calculateTextSize() {
+    // Calcula el tamaño de texto óptimo para llenar el ancho disponible
+    private fun recalculateTextMetrics() {
         val lines = asciiText.split('\n').filter { it.isNotEmpty() }
         if (lines.isEmpty()) return
-        val maxCols = lines.maxOf { it.length }
 
-        // 1. Medir referencia a tamaño base seguro
+        val maxColumns = lines.maxOf { it.length }
+
+        // 1. Medir con tamaño de referencia seguro
         paint.textSize = 100f
-        val baseAdvance = paint.measureText("M")
+        val referenceAdvance = paint.measureText("M")
 
-        // 2. Cálculo dinámico para llenar SIEMPRE el ancho disponible
-        val neededWidth = maxCols * baseAdvance
+        // 2. Calcular escala para llenar el ancho disponible
+        val neededWidth = maxColumns * referenceAdvance
         val scale = width.toFloat() / neededWidth
-        // Mínimo 8px para legibilidad. Sin límite superior artificial.
         val finalSize = (100f * scale).coerceAtLeast(8f)
 
+        // 3. Aplicar tamaño final y recalcular métricas reales
         paint.textSize = finalSize
-        charAdvance = paint.measureText("M") // Recalcular avance real
+        characterWidth = paint.measureText("M")
         lineHeight = paint.fontMetrics.run { descent - ascent }
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        if (w > 0 && h > 0) calculateTextSize() // Recalcula al girar o cambiar layout
+        if (w > 0 && h > 0) recalculateTextMetrics()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -76,34 +85,36 @@ class AsciiView @JvmOverloads constructor(
         canvas.drawColor(Color.BLACK)
         if (asciiText.isEmpty()) return
 
-        // Fallback seguro si el primer frame llega antes del onSizeChanged
-        if (charAdvance <= 0f) calculateTextSize()
+        // Fallback si el primer frame llega antes del onSizeChanged
+        if (characterWidth <= 0f) recalculateTextMetrics()
 
-        val safeColors = colors
-        val drawWithOriginal = useOriginalMode && safeColors != null
+        val activeColors = frameColors
+        val drawWithOriginalColors = useOriginalMode && activeColors != null
 
         val lines = asciiText.split('\n')
-        var y = lineHeight
-        var cIdx = 0
+        var yPosition = lineHeight
+        var charIndex = 0
 
         for (line in lines) {
-            if (y > height) break
-            if (drawWithOriginal) {
-                var x = 0f
-                for (ch in line) {
-                    val color = if (cIdx < safeColors.size) safeColors[cIdx] else baseColor
+            if (yPosition > height) break
+
+            if (drawWithOriginalColors) {
+                // Modo color original: dibuja cada carácter con su color específico
+                var xPosition = 0f
+                for (character in line) {
+                    val color = if (charIndex < activeColors.size) activeColors[charIndex] else baseColor
                     paint.color = color
-                    canvas.drawText(ch.toString(), x, y, paint)
-                    x += charAdvance
-                    cIdx++
+                    canvas.drawText(character.toString(), xPosition, yPosition, paint)
+                    xPosition += characterWidth
+                    charIndex++
                 }
             } else {
-                // 🔹 CLAVE: Restaurar color base al salir de modo píxel
+                // Modo color sólido: dibuja la línea completa con el color base
                 paint.color = baseColor
-                canvas.drawText(line, 0f, y, paint)
-                cIdx += line.length
+                canvas.drawText(line, 0f, yPosition, paint)
+                charIndex += line.length
             }
-            y += lineHeight
+            yPosition += lineHeight
         }
     }
 }

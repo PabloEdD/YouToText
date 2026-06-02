@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="#1E1E1E">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Seleccionar Paleta"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Contenedor para los RadioButtons generados dinámicamente -->
+    <RadioGroup
+        android:id="@+id/radioGroupPalettes"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+
+    <!-- Opción para invertir la paleta -->
+    <CheckBox
+        android:id="@+id/cbInvertPalette"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="8dp"
+        android:buttonTint="#00FF00"
+        android:text="Invertir paleta (oscuro ↔ claro)"
+        android:textColor="#AAAAAA"
+        android:textSize="14sp" />
+
+</LinearLayout>

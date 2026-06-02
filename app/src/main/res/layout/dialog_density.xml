@@ -1,30 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="24dp"
     android:background="#1E1E1E">
 
+    <!-- Título del diálogo -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
         android:text="Densidad de caracteres"
-        android:textSize="18sp"
-        android:textStyle="bold"
         android:textColor="#FFFFFF"
-        android:layout_marginBottom="12dp" />
+        android:textSize="18sp"
+        android:textStyle="bold" />
 
+    <!-- Valor actual del tamaño de bloque -->
     <TextView
         android:id="@+id/tvDensityValue"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Tamaño de bloque: 8"
-        android:textSize="16sp"
-        android:textColor="#00FF00"
+        android:layout_marginBottom="12dp"
         android:gravity="center"
-        android:layout_marginBottom="8dp" />
+        android:text="Tamaño de bloque: 8"
+        android:textColor="#00FF00"
+        android:textSize="16sp"
+        android:textStyle="bold" />
 
+    <!-- Control deslizante para ajustar la densidad (rango 0-20 = 4-24 píxeles) -->
     <SeekBar
         android:id="@+id/seekBarDensity"
         android:layout_width="match_parent"
@@ -33,14 +38,15 @@
         android:progressTint="#00FF00"
         android:thumbTint="#00FF00" />
 
+    <!-- Texto explicativo sobre el funcionamiento del control -->
     <TextView
         android:id="@+id/tvDensityHint"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Cuanto mayor el número, menor la cantidad de caracteres"
-        android:textSize="12sp"
-        android:textColor="#AAAAAA"
+        android:layout_marginTop="16dp"
         android:gravity="center"
-        android:layout_marginTop="12dp" />
+        android:text="Cuanto mayor sea el número, menor la cantidad de caracteres"
+        android:textColor="#AAAAAA"
+        android:textSize="12sp" />
 
 </LinearLayout>

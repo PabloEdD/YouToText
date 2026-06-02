@@ -10,23 +10,42 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+// ViewModel que gestiona el procesamiento de frames ASCII
 class AsciiViewModel : ViewModel() {
-    private val _asciiFrame = MutableStateFlow("")
-    val asciiFrame: StateFlow<String> = _asciiFrame.asStateFlow()
 
-    var currentAscii: String = ""
+    // === FLUJO REACTIVO PARA LA UI ===
+    private val _asciiTextFlow = MutableStateFlow("")
+    val asciiTextFlow: StateFlow<String> = _asciiTextFlow.asStateFlow()
+
+    // === ESTADO ACTUAL DEL FRAME (accesible para la View) ===
+    var currentAsciiText: String = ""
         private set
-    var currentColors: IntArray? = null
-    var usePixelColor = false
-    var baseColor = -16711936
+    var currentFrameColors: IntArray? = null
+        private set
 
-    fun onGridReceived(grid: ByteArray, colors: IntArray?, width: Int, height: Int) {
+    // Procesa el grid de luminancia recibido y lo convierte a texto ASCII
+    fun onGridReceived(
+        luminanceGrid: ByteArray,
+        frameColors: IntArray?,
+        gridWidth: Int,
+        gridHeight: Int
+    ) {
         viewModelScope.launch(Dispatchers.Default) {
-            val palette = SettingsPrefs.getPalette()
-            val ascii = AsciiMapper.mapToAscii(grid, width, height, palette)
-            _asciiFrame.value = ascii
-            currentAscii = ascii
-            currentColors = colors // Se guarda para la View
+            val characterPalette = SettingsPrefs.getPalette()
+            val isInverted = SettingsPrefs.isPaletteInverted()
+
+            val asciiText = AsciiMapper.mapToAscii(
+                luminanceGrid,
+                gridWidth,
+                gridHeight,
+                characterPalette,
+                invert = isInverted
+            )
+
+            // Actualiza el flujo reactivo y el estado actual
+            _asciiTextFlow.value = asciiText
+            currentAsciiText = asciiText
+            currentFrameColors = frameColors
         }
     }
 }

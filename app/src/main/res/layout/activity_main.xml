@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
+    <!-- Visor de la cámara (fondo, detrás del ASCII) -->
     <androidx.camera.view.PreviewView
         android:id="@+id/viewFinder"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone">
+        android:layout_height="match_parent" />
 
-    </androidx.camera.view.PreviewView>
-
+    <!-- Vista que renderiza el texto ASCII en tiempo real -->
     <com.pabortpag.youtotext.ui.view.AsciiView
         android:id="@+id/asciiView"
         android:layout_width="match_parent"
@@ -25,38 +25,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <Button
-        android:id="@+id/image_capture_button"
-        android:layout_width="110dp"
-        android:layout_height="110dp"
-        android:layout_marginBottom="50dp"
-        android:layout_marginEnd="50dp"
-        android:elevation="2dp"
-        android:text="@string/take_photo"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/vertical_centerline" />
-
-    <Button
-        android:id="@+id/video_capture_button"
-        android:layout_width="110dp"
-        android:layout_height="110dp"
-        android:layout_marginBottom="50dp"
-        android:layout_marginStart="50dp"
-        android:elevation="2dp"
-        android:text="@string/start_capture"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toEndOf="@id/vertical_centerline" />
-
-    <androidx.constraintlayout.widget.Guideline
-        android:id="@+id/vertical_centerline"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        app:layout_constraintGuide_percent=".50" />
-
+    <!-- Línea guía horizontal que separa el ASCII de los controles -->
     <androidx.constraintlayout.widget.Guideline
         android:id="@+id/guideline2"
         android:layout_width="wrap_content"
@@ -64,6 +33,7 @@
         android:orientation="horizontal"
         app:layout_constraintGuide_percent="0.83" />
 
+    <!-- Fila de acciones principales: copiar, guardar, cambiar cámara -->
     <LinearLayout
         android:id="@+id/actionRow"
         android:layout_width="match_parent"
@@ -77,33 +47,36 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/asciiView">
 
+        <!-- Botón: Copiar ASCII al portapapeles -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/copyButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="8dp"
+            android:layout_marginHorizontal="12dp"
             android:contentDescription="Copiar al portapapeles"
             android:src="@drawable/copylink"
             app:backgroundTint="#333333"
             app:fabSize="mini"
             app:tint="#FFFFFF" />
 
+        <!-- Botón: Guardar ASCII como imagen PNG -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/photoButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="8dp"
+            android:layout_marginHorizontal="12dp"
             android:contentDescription="Guardar foto"
             android:src="@drawable/logo"
             app:backgroundTint="#333333"
             app:fabSize="mini"
             app:tint="#FFFFFF" />
 
+        <!-- Botón: Cambiar entre cámara frontal y trasera -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/switchCamButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="8dp"
+            android:layout_marginHorizontal="12dp"
             android:contentDescription="Cambiar cámara"
             android:src="@drawable/flechas_girando"
             app:backgroundTint="#333333"
@@ -111,77 +84,81 @@
             app:tint="#FFFFFF" />
     </LinearLayout>
 
-    <!-- 🔹 MENÚ HORIZONTAL: Configuración rápida (Texto compacto) -->
+    <!-- Menú de configuración rápida: color, densidad, paleta, galería -->
     <LinearLayout
         android:id="@+id/settingsMenu"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:background="#0A0A0A"
         android:orientation="horizontal"
-        android:paddingHorizontal="6dp"
+        android:paddingHorizontal="12dp"
         android:paddingVertical="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/actionRow">
 
+        <!-- Botón: Configurar color del texto ASCII -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnColor"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp"
+            android:layout_marginEnd="6dp"
             android:layout_weight="1"
             android:minHeight="40dp"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
             android:text="Color"
             android:textColor="#FFFFFF"
             android:textSize="13sp"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="4dp"
             app:backgroundTint="#333333"
             app:cornerRadius="20dp" />
 
+        <!-- Botón: Ajustar densidad de caracteres -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDensity"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="2dp"
+            android:layout_marginHorizontal="6dp"
             android:layout_weight="1"
             android:minHeight="40dp"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
             android:text="Densidad"
             android:textColor="#FFFFFF"
             android:textSize="13sp"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="4dp"
             app:backgroundTint="#333333"
             app:cornerRadius="20dp" />
 
+        <!-- Botón: Seleccionar paleta de caracteres -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnPalette"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
+            android:layout_marginHorizontal="6dp"
             android:layout_weight="1"
             android:minHeight="40dp"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
             android:text="Paleta"
             android:textColor="#FFFFFF"
             android:textSize="13sp"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="4dp"
             app:backgroundTint="#333333"
             app:cornerRadius="20dp" />
 
+        <!-- Botón: Abrir galería de capturas guardadas -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnGallery"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
+            android:layout_marginStart="6dp"
             android:layout_weight="1"
             android:minHeight="40dp"
-            android:text="Galeria"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
+            android:text="Galería"
             android:textColor="#FFFFFF"
             android:textSize="13sp"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="4dp"
             app:backgroundTint="#333333"
             app:cornerRadius="20dp" />
     </LinearLayout>
