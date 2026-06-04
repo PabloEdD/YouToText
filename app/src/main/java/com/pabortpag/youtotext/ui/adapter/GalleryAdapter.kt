@@ -34,12 +34,27 @@ class GalleryAdapter(
 
             scope.launch {
                 try {
-                    val bmp = AsciiCanvasRenderer.renderPreviewBitmap(
-                        asciiText = record.asciiText,
-                        baseColor = record.baseColor,
-                        targetWidthPx = 250,
-                        targetHeightPx = 500
-                    )
+                    val bmp = if (record.isOriginalColor && !record.colorsString.isNullOrEmpty()) {
+                        // Si es modo original, deserializamos el array y lo pasamos al renderer
+                        val colorsArray = record.colorsString.split(",").map { it.toInt() }.toIntArray()
+                        AsciiCanvasRenderer.renderPreviewBitmap(
+                            asciiText = record.asciiText,
+                            baseColor = record.baseColor,
+                            targetWidthPx = 250,
+                            targetHeightPx = 500,
+                            isOriginalColor = true,
+                            colors = colorsArray
+                        )
+                    } else {
+                        // Si es color sólido, usamos el método normal
+                        AsciiCanvasRenderer.renderPreviewBitmap(
+                            asciiText = record.asciiText,
+                            baseColor = record.baseColor,
+                            targetWidthPx = 250,
+                            targetHeightPx = 500
+                        )
+                    }
+
                     withContext(Dispatchers.Main) {
                         binding.ivPreview.setImageBitmap(bmp)
                     }

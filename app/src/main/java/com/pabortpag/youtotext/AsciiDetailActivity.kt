@@ -85,8 +85,15 @@ class AsciiDetailActivity : AppCompatActivity() {
 
     // Renderiza el texto ASCII en la vista con el color guardado
     private fun renderAscii(record: AsciiRecord) {
-        binding.asciiView.setBaseColor(record.baseColor)
-        binding.asciiView.updateFrame(record.asciiText, null, false)
+        if (record.isOriginalColor && record.colorsString != null) {
+            // Modo color real
+            val colors = record.colorsString.split(",").map { it.toInt() }.toIntArray()
+            binding.asciiView.updateFrame(record.asciiText, colors, true)
+        } else {
+            // Modo color sólido (comportamiento original)
+            binding.asciiView.setBaseColor(record.baseColor)
+            binding.asciiView.updateFrame(record.asciiText, null, false)
+        }
     }
 
     // Exporta el ASCII a un archivo PNG en la galería del dispositivo

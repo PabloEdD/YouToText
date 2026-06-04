@@ -13,5 +13,7 @@ data class AsciiRecord(
     val baseColor: Int,             // Color base en formato Int (ARGB) aplicado en el momento de la captura
     val blockFactor: Int,           // Densidad o tamaño de bloque utilizado para el muestreo espacial
     val characterPalette: String,   // Conjunto de caracteres (paleta) utilizado para la conversión
+    val isOriginalColor: Boolean = false, // Comprueba si el ASCII esta en color real
+    val colorsString: String? = null, // Array de colores serializado
     val timestamp: Long = System.currentTimeMillis() // Fecha y hora de la creación del registro (usado para ordenar)
 )

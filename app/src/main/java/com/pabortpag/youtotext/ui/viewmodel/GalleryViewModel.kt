@@ -19,14 +19,22 @@ class GalleryViewModel(private val asciiDao: AsciiDao) : ViewModel() {
         asciiText: String,
         baseColor: Int,
         blockFactor: Int,
-        characterPalette: String
+        characterPalette: String,
+        isOriginalColor: Boolean,
+        frameColors: IntArray?
     ) {
         viewModelScope.launch {
+            val colorsString = if (isOriginalColor && frameColors != null) {
+                frameColors.joinToString(",")
+            } else null
+
             val newRecord = AsciiRecord(
                 asciiText = asciiText,
                 baseColor = baseColor,
                 blockFactor = blockFactor,
-                characterPalette = characterPalette
+                characterPalette = characterPalette,
+                isOriginalColor = isOriginalColor,
+                colorsString = colorsString
             )
             asciiDao.insertRecord(newRecord)
         }

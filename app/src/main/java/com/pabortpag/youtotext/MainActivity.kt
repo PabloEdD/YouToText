@@ -106,7 +106,9 @@ class MainActivity : AppCompatActivity() {
                     asciiText = text,
                     baseColor = SettingsPrefs.getColor(),
                     blockFactor = SettingsPrefs.getBlockFactor(),
-                    characterPalette = SettingsPrefs.getPalette()
+                    characterPalette = SettingsPrefs.getPalette(),
+                    isOriginalColor = SettingsPrefs.isOriginalColorMode(),
+                    frameColors = asciiViewModel.currentFrameColors
                 )
             }
         }
@@ -121,7 +123,9 @@ class MainActivity : AppCompatActivity() {
                         asciiText = text,
                         baseColor = SettingsPrefs.getColor(),
                         blockFactor = SettingsPrefs.getBlockFactor(),
-                        characterPalette = SettingsPrefs.getPalette()
+                        characterPalette = SettingsPrefs.getPalette(),
+                        isOriginalColor = SettingsPrefs.isOriginalColorMode(),
+                        frameColors = asciiViewModel.currentFrameColors
                     )
                     Toast.makeText(this@MainActivity, "Imagen guardada", Toast.LENGTH_SHORT).show()
                 }

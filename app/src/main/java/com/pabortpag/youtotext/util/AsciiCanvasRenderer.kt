@@ -44,13 +44,13 @@ object AsciiCanvasRenderer {
         asciiText: String,
         baseColor: Int,
         targetWidthPx: Int,
-        targetHeightPx: Int
+        targetHeightPx: Int,
+        isOriginalColor: Boolean = false,
+        colors: IntArray? = null
     ): Bitmap {
-        val bitmap = Bitmap.createBitmap(targetWidthPx, targetHeightPx, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        canvas.drawColor(Color.BLACK)
-
-        if (asciiText.isBlank()) return bitmap
+        if (asciiText.isBlank()) {
+            return Bitmap.createBitmap(targetWidthPx, targetHeightPx, Bitmap.Config.ARGB_8888)
+        }
 
         val paint = Paint().apply {
             typeface = Typeface.MONOSPACE
@@ -67,35 +67,58 @@ object AsciiCanvasRenderer {
         val charWidthAt100 = paint.measureText("M").coerceAtLeast(1f)
         val lineHeightAt100 = paint.fontMetrics.run { descent - ascent }.coerceAtLeast(1f)
 
-        // 2. Calcular factores de escala (SIN multiplicar por 100f extra)
-        // Escala necesaria para que el ancho encaje en targetWidthPx
+        // 2. Calcular escala PARA LLENAR EL ANCHO
         val scaleByWidth = targetWidthPx.toFloat() / (charWidthAt100 * maxColumns)
-        // Escala necesaria para que el alto encaje en targetHeightPx
-        val scaleByHeight = targetHeightPx.toFloat() / (lineHeightAt100 * maxRows)
+        val naturalHeight = (lineHeightAt100 * scaleByWidth * maxRows).toInt()
 
-        // 3. Usamos la escala MENOR para garantizar que quepa en AMBOS ejes
-        val finalScale = minOf(scaleByWidth, scaleByHeight)
-
-        // 4. Aplicar escala (textSize = 100f * escala)
-        // Coercionamos entre 8f y 200f para evitar renders invisibles o colapsos
-        paint.textSize = (100f * finalScale).coerceIn(8f, 200f)
-
-        val lineHeight = paint.fontMetrics.run { descent - ascent }
-
-        // 5. Centrar verticalmente si sobra espacio
-        val totalTextHeight = lineHeight * maxRows
-        val startY = if (totalTextHeight < targetHeightPx) {
-            (targetHeightPx - totalTextHeight) / 2 + lineHeight
+        val maxHeight = targetHeightPx.coerceAtLeast(200)
+        val finalScale = if (naturalHeight > maxHeight) {
+            scaleByWidth * (maxHeight.toFloat() / naturalHeight)
         } else {
-            lineHeight
+            scaleByWidth
+        }
+
+        // 3. Aplicar la escala final
+        paint.textSize = (100f * finalScale).coerceIn(8f, 200f)
+        val finalLineHeight = paint.fontMetrics.run { descent - ascent }
+        val charWidth = paint.measureText("M") // Ancho real de un carácter
+
+        val bitmapHeight = (finalLineHeight * maxRows).toInt().coerceAtLeast(100)
+
+        val bitmap = Bitmap.createBitmap(targetWidthPx, bitmapHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.BLACK)
+
+        // 4. Centrar verticalmente si sobra espacio
+        val totalTextHeight = finalLineHeight * maxRows
+        val startY = if (totalTextHeight < bitmapHeight) {
+            (bitmapHeight - totalTextHeight) / 2 + finalLineHeight
+        } else {
+            finalLineHeight
         }
 
         var yPosition = startY
+        var colorIndex = 0
 
+        // 5. Dibujar el texto (carácter a carácter si es modo original)
         for (textLine in lines) {
-            if (yPosition > targetHeightPx) break
-            canvas.drawText(textLine, 0f, yPosition, paint)
-            yPosition += lineHeight
+            if (yPosition > bitmapHeight) break
+
+            if (isOriginalColor && colors != null) {
+                var xPosition = 0f
+                for (char in textLine) {
+                    val color = if (colorIndex < colors.size) colors[colorIndex] else baseColor
+                    paint.color = color
+                    canvas.drawText(char.toString(), xPosition, yPosition, paint)
+                    xPosition += charWidth
+                    colorIndex++
+                }
+            } else {
+                paint.color = baseColor
+                canvas.drawText(textLine, 0f, yPosition, paint)
+                colorIndex += textLine.length
+            }
+            yPosition += finalLineHeight
         }
 
         return bitmap
